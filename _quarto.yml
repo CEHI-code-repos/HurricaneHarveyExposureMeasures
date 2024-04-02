@@ -1,0 +1,30 @@
+project:
+  type: book
+  output-dir: docs
+
+book:
+  title: "Exposure Calculations"
+  author: "Ryan Zomorrodi"
+  date: last-modified
+  chapters:
+    - index.qmd
+    - part: Measure Calculations
+      chapters:
+        - flood.qmd
+        - wind.qmd
+        - precipitation.qmd
+        - distance.qmd
+        - svi.qmd
+
+bibliography: references.bib
+
+execute:
+  freeze: auto
+  warning: false
+
+format:
+  html:
+    theme: cosmo
+
+
+

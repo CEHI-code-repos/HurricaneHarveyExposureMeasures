@@ -1,0 +1,12 @@
+# Introduction {.unnumbered}
+
+This repository holds the code used to calculate Hurricane Harvey exposure calculations for the Children's Environmental Health Initiative. All exposure measures were calculated at the ZCTA level for the states of Texas and Louisiana.
+
+We identify three major exposure categories which we aim to measure:
+
+- Flood
+- Wind
+- Precipitation
+- Distance from Stork Track
+
+We also calculated Social Vulnerability Index estimates at the ZCTA level

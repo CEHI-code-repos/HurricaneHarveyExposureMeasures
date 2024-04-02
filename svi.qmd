@@ -1,0 +1,131 @@
+---
+execute:
+  warning: false
+  error: false
+  cache: true
+---
+
+# Social Vulnerability Index
+
+## Data Procurement
+*   Raw 2015-2019 ACS data used for calculations were downloaded from the `findSVI` package using the `tidycensus` dependency.  
+*   ZCTA to County Crosswalk was downloaded from [https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt](https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt)
+
+## Data Processing 
+The `findSVI` package calculates SVI percentiles for a geography of choice. In this case, we used ZCTAs.
+
+1.  The `find_svi` command was used to both download 2015-2019 ACS data at the ZCTA level and calculate the SVI quartiles as according to the CDC/ASTDR SVI documentation.
+2.  Utilizing the ZCTA to county crosswalk, which contains a list of every ZCTA and its intersecting states, the `find_svi` results were limited to those ZCTAs which intersect with Texas and Louisiana
+3.  Results were output to a parquet
+
+More information about the `findSVI` package can be found [here](https://heli-xu.github.io/findSVI/).
+
+## Data Output
+-   `TXLA_ZCTA_SVI1519.parquet`
+
+## Code
+The variables used in this calculation are as follows:
+```{r}
+#| output: asis
+library(findSVI)
+library(tidycensus)
+library(tidyverse)
+
+acs2019vars <- c("acs5", "acs5/subject", "acs5/profile", "acs5/cprofile") %>%
+  map_df(~ load_variables(2019, .x) %>% mutate(table = .x)) %>%
+  select(-concept, -geography)
+
+census_variables_2019 %>% 
+  map(~ filter(acs2019vars, name %in% str_sub(.x, end = -2))) %>%
+  map(knitr::kable)
+```
+
+``` {r}
+#| include: false
+#| eval: false
+
+# this code generates the same data as get_census_data
+df <- census_variables_2019 %>% 
+  map(~ filter(acs2019vars, name %in% str_sub(.x, end = -2))) %>%
+  list_rbind() %>%
+  distinct() %>%
+  group_by(table) %>%
+  group_split() %>%
+  map(~ get_acs("zcta", variables = .x$name, year = 2019, output = "wide")) %>%
+  list_cbind() %>%
+  rename(GEOID = GEOID...1, NAME = NAME...2) %>%
+  select(-matches("\\d+$"))
+```
+
+This single command downloads the 2015-2019 ACS5 at the zcta level and calculates the SVI theme percentiles for the entire country
+```{r}
+svi <- find_svi(year = 2019, geography = "zcta", full.table = TRUE)
+```
+
+Calculated SVI is filtered to the state of Texas (FIPS: 48) and Louisiana (FIPS: 22)
+```{r}
+#| output: false
+
+library(sf)
+library(tigris)
+
+ZCTAs <- read_csv("https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt") %>%
+  filter(STATE %in% c(48, 22)) %>%
+  distinct(ZCTA5) %>%
+  rename(GEOID = ZCTA5)
+
+ZCTAs_sf <- ZCTAs %>%
+  left_join(zctas(cb = FALSE, year = 2017), by = join_by(GEOID == GEOID10)) %>%
+  st_as_sf() %>%
+  select(-c(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))
+
+TXLA_svi <- svi %>%
+  filter(GEOID %in% unlist(ZCTAs)) %>%
+  select(-c(year, state)) %>%
+  mutate(across(starts_with("E_"), as.integer))
+```
+
+```{r}
+#| fig-height: 20
+
+library(gridExtra)
+
+output_maps <- colnames(TXLA_svi) %>% 
+  `[`(str_detect(., "theme")) %>%
+  map(~
+    TXLA_svi %>% 
+    left_join(ZCTAs_sf) %>%
+    st_as_sf() %>%
+    ggplot() +
+      geom_sf(aes(fill = !!sym(.x)), linewidth = 0, color = NA) +
+      coord_sf(datum = "ESRI:102003") +
+      scale_fill_distiller(
+        palette = "BuPu",
+        guide = guide_colorbar(
+          direction = "horizontal",
+          title.position = "top")) +
+      theme_void() +
+      theme(
+        plot.title = element_text(face = "bold", size = 16),
+        plot.subtitle = element_text(face = "bold", size = 12),
+        plot.caption = element_text(size = 10, hjust = 0),
+        legend.title = element_text(face = "bold", size = 12),
+        legend.text = element_text(face = "bold", size = 12),
+        legend.title.align=0.5,
+        legend.position = "bottom",
+        legend.key.width = unit(dev.size()[1] / 20, "inches")) +
+      labs(
+        caption = "Author: Ryan Zomorrodi\nDate: 4/1/2024\nSource: FEMA National Flood Hazard Layer")
+  )
+
+do.call(grid.arrange, c(output_maps, ncol = 2))
+```
+
+Outputed SVI to parquet.
+``` {r}
+#| eval: false
+library(arrow)
+
+TXLA_svi %>%
+  write_parquet("output/TXLA_ZCTA_SVI1519.parquet")
+```

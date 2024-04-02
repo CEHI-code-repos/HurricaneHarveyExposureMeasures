@@ -1,0 +1,276 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Exposure Calculations",
+    "section": "",
+    "text": "Introduction\nThis repository holds the code used to calculate Hurricane Harvey exposure calculations for the Children’s Environmental Health Initiative. All exposure measures were calculated at the ZCTA level for the states of Texas and Louisiana.\nWe identify three major exposure categories which we aim to measure:\n\nFlood\nWind\nPrecipitation\nDistance from Stork Track\n\nWe also calculated Social Vulnerability Index estimates at the ZCTA level",
+    "crumbs": [
+      "Introduction"
+    ]
+  },
+  {
+    "objectID": "flood.html",
+    "href": "flood.html",
+    "title": "1  Flood",
+    "section": "",
+    "text": "1.1 Data Procurement",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Flood</span>"
+    ]
+  },
+  {
+    "objectID": "flood.html#data-procurement",
+    "href": "flood.html#data-procurement",
+    "title": "1  Flood",
+    "section": "",
+    "text": "FEMA National Flood Hazard Layer was downloaded from the FEMA Flood Map Service Center.\nZCTA to County Crosswalk was downloaded from https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt\nZCTA shapefiles were downloaded for the entire US using the tigris package",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Flood</span>"
+    ]
+  },
+  {
+    "objectID": "flood.html#data-processing",
+    "href": "flood.html#data-processing",
+    "title": "1  Flood",
+    "section": "1.2 Data Processing",
+    "text": "1.2 Data Processing\n\nFEMA National Flood Hazard Layers were downloaded for the state of Texas and Louisiana\nSeparately, 2017 ZCTAs downloaded from the US Census Cartographic Boundary Files\nThen, the ZCTAs were joined to the US Census ZCTA to County Crosswalk in order to identify Texas and Louisiana ZCTAs\nThe ZCTAs were filtered to Texas and Louisiana\nA geodatabase was created\nThe ZCTAs were written to the geodatabase\nFEMA National Flood Hazard Layers were merged and written to geodatabase\nFEMA National Flood Hazard Layers were cast to rasters\nThe FEMA Flood Hazard areal coverage for each ZCTA was calculated using Tabulate Area (m^2)\nTotal ZCTA area was calculated (m^2)\nPercent ZCTA Flood Hazard areal coverage was calculated",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Flood</span>"
+    ]
+  },
+  {
+    "objectID": "flood.html#output",
+    "href": "flood.html#output",
+    "title": "1  Flood",
+    "section": "1.3 Output",
+    "text": "1.3 Output\n\nTXLA_ZCTA_FEMA_HAZ.parquet\n\nGEOID - ZCTA GEOID\nArea - Total ZCTA Area\nA to X - Areal coverage (m^2) for each FEMA flood designation\nPct[A to X] - Percent covered for each FEMA flood designation\nPctNoFEMACover - Percent not covered by any FEMA flood designation\nPctHighRisk - Percent covered by FEMA flood designations beginning by A or V\nPctLowMediumRisk - Percent covered by FEMA flood designations beginning by B, X, C\n\n\nMore information about the FEMA flood designations, see this helpful documentation published by Shawnee County",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Flood</span>"
+    ]
+  },
+  {
+    "objectID": "flood.html#code",
+    "href": "flood.html#code",
+    "title": "1  Flood",
+    "section": "1.4 Code",
+    "text": "1.4 Code\nDownloaded FEMA National Flood Hazard Layers\n\nlibrary(httr2)\nlibrary(tidyverse)\n\noptions(timeout = 20 * 60) \n\n\ntemp_dir &lt;- tempdir()\ntemp_file &lt;- tempfile()\nrequest(\"https://msc.fema.gov/portal/downloadProduct\") %&gt;%\n  req_url_query(productTypeID = \"NFHL\", productSubTypeID = \"NFHL_STATE_DATA\", productID = \"NFHL_22_20231221\") %&gt;% \n  pluck(\"url\") %&gt;%\n  download.file(temp_file, mode = \"wb\")\nunzip(temp_file, exdir = temp_dir)\n\n\ntemp_file &lt;- tempfile()\nrequest(\"https://msc.fema.gov/portal/downloadProduct\") %&gt;%\n  req_url_query(productTypeID = \"NFHL\", productSubTypeID = \"NFHL_STATE_DATA\", productID = \"NFHL_48_20240314\") %&gt;% \n  pluck(\"url\") %&gt;%\n  download.file(temp_file, mode = \"wb\")\nunzip(temp_file, exdir = temp_dir)\n\nDownloaded ZCTAs for TX and LA and wrote to a geodatabase\n\nlibrary(sf)\nlibrary(tigris)\n\nZCTAs &lt;- read_csv(\"https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt\") %&gt;%\n  filter(STATE %in% c(48, 22)) %&gt;%\n  distinct(ZCTA5) %&gt;%\n  rename(GEOID = ZCTA5)\n\nZCTAs_sf &lt;- ZCTAs %&gt;%\n  left_join(zctas(cb = FALSE, year = 2017), by = join_by(GEOID == GEOID10)) %&gt;%\n  st_as_sf() %&gt;%\n  select(-c(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))\n\nZCTAs_sf %&gt;%\n  st_write(str_c(temp_dir, \"/NFHL_TXLA.gdb\"), \"ZCTAs\")\n\nStarted r to Python bridge\n\nreticulate::use_python(\"C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/python.exe\")\n\nMerged FEMA National Flood Hazard Layers for TX and LA\n\nwith arcpy.EnvManager(outputCoordinateSystem='PROJCS[\"USA_Contiguous_Albers_Equal_Area_Conic\",GEOGCS[\"GCS_North_American_1983\",DATUM[\"D_North_American_1983\",SPHEROID[\"GRS_1980\",6378137.0,298.257222101]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]],PROJECTION[\"Albers\"],PARAMETER[\"False_Easting\",0.0],PARAMETER[\"False_Northing\",0.0],PARAMETER[\"Central_Meridian\",-96.0],PARAMETER[\"Standard_Parallel_1\",29.5],PARAMETER[\"Standard_Parallel_2\",45.5],PARAMETER[\"Latitude_Of_Origin\",37.5],UNIT[\"Meter\",1.0]]'):\n    arcpy.management.Merge(\n        inputs= r.temp_dir + r\"\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR;\" + r.temp_dir + r\"\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR\",\n        output= r.temp_dir + r\"\\NFHL_TXLA.gdb\\S_FLD_HAZ_AR\",\n        field_mappings=r'DFIRM_ID \"DFIRM_ID\" true true false 6 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,DFIRM_ID,0,5,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,DFIRM_ID,0,5;VERSION_ID \"VERSION_ID\" true true false 11 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,VERSION_ID,0,10,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,VERSION_ID,0,10;FLD_AR_ID \"FLD_AR_ID\" true true false 32 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,FLD_AR_ID,0,31,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,FLD_AR_ID,0,31;STUDY_TYP \"STUDY_TYP\" true true false 38 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,STUDY_TYP,0,37,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,STUDY_TYP,0,37;FLD_ZONE \"FLD_ZONE\" true true false 17 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,FLD_ZONE,0,16,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,FLD_ZONE,0,16;ZONE_SUBTY \"ZONE_SUBTY\" true true false 76 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,ZONE_SUBTY,0,75,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,ZONE_SUBTY,0,75;SFHA_TF \"SFHA_TF\" true true false 1 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,SFHA_TF,0,254,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,SFHA_TF,0,254;STATIC_BFE \"STATIC_BFE\" true true false 8 Double 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,STATIC_BFE,-1,-1,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,STATIC_BFE,-1,-1;V_DATUM \"V_DATUM\" true true false 17 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,V_DATUM,0,16,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,V_DATUM,0,16;DEPTH \"DEPTH\" true true false 8 Double 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,DEPTH,-1,-1,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,DEPTH,-1,-1;LEN_UNIT \"LEN_UNIT\" true true false 16 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,LEN_UNIT,0,15,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,LEN_UNIT,0,15;VELOCITY \"VELOCITY\" true true false 8 Double 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,VELOCITY,-1,-1,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,VELOCITY,-1,-1;VEL_UNIT \"VEL_UNIT\" true true false 20 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,VEL_UNIT,0,19,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,VEL_UNIT,0,19;AR_REVERT \"AR_REVERT\" true true false 17 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,AR_REVERT,0,16,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,AR_REVERT,0,16;AR_SUBTRV \"AR_SUBTRV\" true true false 57 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,AR_SUBTRV,0,56,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,AR_SUBTRV,0,56;BFE_REVERT \"BFE_REVERT\" true true false 8 Double 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,BFE_REVERT,-1,-1,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,BFE_REVERT,-1,-1;DEP_REVERT \"DEP_REVERT\" true true false 8 Double 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,DEP_REVERT,-1,-1,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,DEP_REVERT,-1,-1;DUAL_ZONE \"DUAL_ZONE\" true true false 1 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,DUAL_ZONE,0,254,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,DUAL_ZONE,0,254;SOURCE_CIT \"SOURCE_CIT\" true true false 21 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,SOURCE_CIT,0,20,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,SOURCE_CIT,0,20;GFID \"GFID\" true true false 36 Text 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,GFID,0,35,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,GFID,0,35;SHAPE_Length \"SHAPE_Length\" false true true 8 Double 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,SHAPE_Length,-1,-1,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,SHAPE_Length,-1,-1;SHAPE_Area \"SHAPE_Area\" false true true 8 Double 0 0,First,#,' + r.temp_dir + r'\\NFHL_22_20231221.gdb\\S_FLD_HAZ_AR,SHAPE_Area,-1,-1,' + r.temp_dir + r'\\NFHL_48_20240314.gdb\\S_FLD_HAZ_AR,SHAPE_Area,-1,-1',\n        add_source=\"NO_SOURCE_INFO\"\n    )\n\nConverted the FEMA National Flood Hazard Layers to a raster\n\nwith arcpy.EnvManager(outputCoordinateSystem='PROJCS[\"USA_Contiguous_Albers_Equal_Area_Conic\",GEOGCS[\"GCS_North_American_1983\",DATUM[\"D_North_American_1983\",SPHEROID[\"GRS_1980\",6378137.0,298.257222101]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]],PROJECTION[\"Albers\"],PARAMETER[\"False_Easting\",0.0],PARAMETER[\"False_Northing\",0.0],PARAMETER[\"Central_Meridian\",-96.0],PARAMETER[\"Standard_Parallel_1\",29.5],PARAMETER[\"Standard_Parallel_2\",45.5],PARAMETER[\"Latitude_Of_Origin\",37.5],UNIT[\"Meter\",1.0]]'):\n    arcpy.conversion.PolygonToRaster(\n        in_features= r.temp_dir + r\"\\NFHL_TXLA.gdb\\S_FLD_HAZ_AR\",\n        value_field=\"FLD_ZONE\",\n        out_rasterdataset= r.temp_dir + r\"\\NFHL_TXLA.gdb\\FLD_HAZ_raster\",\n        cell_assignment=\"CELL_CENTER\",\n        priority_field=\"NONE\",\n        cellsize= 10,\n        build_rat=\"BUILD\"\n    )\n\nTabulated FEMA National Flood Hazard Layers area for each ZCTA\n\narcpy.sa.TabulateArea(\n    in_zone_data= r.temp_dir + r\"\\NFHL_TXLA.gdb\\ZCTAs\",\n    zone_field=\"GEOID\",\n    in_class_data= r.temp_dir + r\"\\NFHL_TXLA.gdb\\FLD_HAZ_raster\\Band_1\",\n    class_field=\"FLD_ZONE\",\n    out_table= r.temp_dir + r\"\\NFHL_TXLA.gdb\\ZCTA_FLD_HAZ_AR\",\n    processing_cell_size= r.temp_dir + r\"\\NFHL_TXLA.gdb\\FLD_HAZ_raster\\Band_1\",\n    classes_as_rows=\"CLASSES_AS_FIELDS\"\n)\n\nCalculated Total ZCTA area\n\narcpy.management.CalculateGeometryAttributes(\n    in_features= r.temp_dir + r\"\\NFHL_TXLA.gdb\\ZCTAs\",\n    geometry_property=\"Area AREA_GEODESIC\",\n    length_unit=\"\",\n    area_unit=\"SQUARE_METERS\",\n    coordinate_system='PROJCS[\"USA_Contiguous_Albers_Equal_Area_Conic\",GEOGCS[\"GCS_North_American_1983\",DATUM[\"D_North_American_1983\",SPHEROID[\"GRS_1980\",6378137.0,298.257222101]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]],PROJECTION[\"Albers\"],PARAMETER[\"False_Easting\",0.0],PARAMETER[\"False_Northing\",0.0],PARAMETER[\"Central_Meridian\",-96.0],PARAMETER[\"Standard_Parallel_1\",29.5],PARAMETER[\"Standard_Parallel_2\",45.5],PARAMETER[\"Latitude_Of_Origin\",37.5],UNIT[\"Meter\",1.0]]',\n    coordinate_format=\"SAME_AS_INPUT\"\n)\n\nCalculated percent areal coverage for various flood designations and categories\n\nTXLA_ZCTA_FEMA_HAZ &lt;- st_read(str_c(temp_dir, \"/NFHL_TXLA.gdb\"), \"ZCTAs\") %&gt;%\n  left_join(st_read(str_c(temp_dir, \"/NFHL_TXLA.gdb\"), \"ZCTA_FLD_HAZ_AR\")) %&gt;%\n  st_drop_geometry() %&gt;%\n  as_tibble() %&gt;%\n  mutate(across(where(is.numeric), ~ replace_na(., 0))) %&gt;%\n  mutate(across(where(is.numeric) & !Area, ~ .x / Area, .names = \"Pct{.col}\")) %&gt;%\n  mutate(PctNoFEMACover = 1 - rowSums(select(., starts_with(\"Pct\")))) %&gt;%\n  mutate(PctHighRisk = rowSums(select(., starts_with(c(\"PctA\", \"PctV\"))))) %&gt;%\n  mutate(PctLowMediumRisk = rowSums(select(., starts_with(c(\"PctB\", \"PctX\", \"PctC\"))))) %&gt;%\n  mutate(across(PctNoFEMACover | PctHighRisk | PctLowMediumRisk, \n    ~ case_when(\n      .x &gt; 1 ~ 1,\n      .x &lt; 0 ~ 0,\n      .default = .x\n    )\n  )) \n\nPlot areal coverage for high flood risk designations\n\nTXLA_ZCTA_FEMA_HAZ %&gt;%\n  left_join(st_read(str_c(temp_dir, \"/NFHL_TXLA.gdb\"), \"ZCTAs\")) %&gt;%\n  st_as_sf() %&gt;%\n  ggplot() +\n    geom_sf(aes(fill = PctHighRisk), linewidth = 0) +\n    coord_sf(datum = \"ESRI:102003\") +\n    scale_fill_distiller(\n      limits = c(0, 1),\n      palette = \"YlOrRd\",\n      name = \"High Flood Risk Coverage\",\n      direction = 1,\n      guide = guide_colorbar(\n        direction = \"horizontal\",\n        title.position = \"top\")) +\n    theme_void() +\n    theme(\n      plot.title = element_text(face = \"bold\", size = 16),\n      plot.subtitle = element_text(face = \"bold\", size = 12),\n      plot.caption = element_text(size = 10, hjust = 0),\n      legend.title = element_text(face = \"bold\", size = 12),\n      legend.text = element_text(face = \"bold\", size = 12),\n      legend.title.align=0.5,\n      legend.position = \"bottom\",\n      legend.key.width = unit(dev.size()[1] / 10, \"inches\")) +\n    labs(\n      title = \"High Flood Risk Coverage by ZCTA \", \n      subtitle = \"Texas and Louisiana\",\n      caption = \"Author: Ryan Zomorrodi\\nDate: 4/1/2024\\nSource: FEMA National Flood Hazard Layer\")\n\nReading layer `ZCTAs' from data source \n  `C:\\Users\\User\\AppData\\Local\\Temp\\RtmpimwM8v\\NFHL_TXLA.gdb' \n  using driver `OpenFileGDB'\nSimple feature collection with 2455 features and 2 fields\nGeometry type: MULTIPOLYGON\nDimension:     XY\nBounding box:  xmin: -106.6845 ymin: 25.83716 xmax: -88.99085 ymax: 36.82041\nGeodetic CRS:  NAD83\n\n\n\n\n\n\n\n\n\n\nTXLA_ZCTA_FEMA_HAZ %&gt;%\n  write_parquet(\"output/TXLA_ZCTA_FEMA_HAZ.parquet\")",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Flood</span>"
+    ]
+  },
+  {
+    "objectID": "wind.html",
+    "href": "wind.html",
+    "title": "2  stormwindmodel for Harvey",
+    "section": "",
+    "text": "2.1 Data Procurement\nA vignette for the hurricaneexposuredata package can be found here",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>`stormwindmodel` for Harvey</span>"
+    ]
+  },
+  {
+    "objectID": "wind.html#data-procurement",
+    "href": "wind.html#data-procurement",
+    "title": "2  stormwindmodel for Harvey",
+    "section": "",
+    "text": "Hurricane track data was downloaded from the hurricaneexposuredata package using the data(\"hurr_tracks\") command. This data originates from the HURDAT2.\nZCTA to County Crosswalk was downloaded from https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt\nZCTA shapefiles were downloaded for the entire US using the tigris package",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>`stormwindmodel` for Harvey</span>"
+    ]
+  },
+  {
+    "objectID": "wind.html#data-processing",
+    "href": "wind.html#data-processing",
+    "title": "2  stormwindmodel for Harvey",
+    "section": "2.2 Data Processing",
+    "text": "2.2 Data Processing\nThe stormwindmodel estimates wind exposure for points. In this case we used wind exposure at ZCTA geometric centroids to estimate wind exposure for the entire ZCTA.\n\nHurricane data was downloaded using hurricaneexposuredata package using the data(\"hurr_tracks\") command and filtered using the Harvey Automated Tropical Cyclone Forecasting code (AL092017)\nSeparately, 2017 ZCTAs downloaded from the US Census Cartographic Boundary Files\nThen, the ZCTAs were joined to the US Census ZCTA to County Crosswalk in order to identify Texas and Louisiana ZCTAs\nThe ZCTAs were filtered to Texas and Louisiana\nGeometrics centroids were calculated for each ZCTA\nThe get_grid_winds command was used to calculate wind exposure for each centroid. It works by\n\nImputing the hurricane track to every 15 minutes\nAdding the wind radii from the HURDAT2\nModeling wind exposure for each point\n\n\nMore information about the stormwindmodel package and variables calculated are included in this vignette",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>`stormwindmodel` for Harvey</span>"
+    ]
+  },
+  {
+    "objectID": "wind.html#output",
+    "href": "wind.html#output",
+    "title": "2  stormwindmodel for Harvey",
+    "section": "2.3 Output",
+    "text": "2.3 Output\n\nTXLA_ZCTA_AL092017_stormwindmodel.parquet\n\nGEOID - ZCTA\ndate_time_max_wind - date & time where maximum wind was sustained\nvmax_sust - Maximum 10-m 1-min sustained wind for the tropical cyclone (m/s)\nvmax_gust - Max 10-m 1-min gust wind experienced at grid point (m/s)\nsust_dur - Duration of time a certain sustained wind was experienced at grid point (minutes)\ngust_dur - Duration of time a certain gust wind was experienced at grid point (minutes)",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>`stormwindmodel` for Harvey</span>"
+    ]
+  },
+  {
+    "objectID": "wind.html#code",
+    "href": "wind.html#code",
+    "title": "2  stormwindmodel for Harvey",
+    "section": "2.4 Code",
+    "text": "2.4 Code\nStorm track data is filtered for Hurricane Harvey\n\nlibrary(hurricaneexposuredata)\nlibrary(stormwindmodel)\nlibrary(tidyverse)\n\ndata(\"hurr_tracks\")\n\nAL092017_track &lt;- hurr_tracks %&gt;%\n  filter(usa_atcf_id == \"AL092017\") %&gt;%\n  select(-c(storm_id, usa_atcf_id))\n\nZCTA geo-centoids were calculated\n\nlibrary(tigris)\nlibrary(sf)\n\nZCTAs &lt;- read_csv(\"https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt\") %&gt;%\n  filter(STATE %in% c(48, 22)) %&gt;%\n  distinct(ZCTA5) %&gt;%\n  rename(GEOID = ZCTA5)\n\nZCTAs_sf &lt;- ZCTAs %&gt;%\n  left_join(zctas(cb = FALSE, year = 2017), by = join_by(GEOID == GEOID10)) %&gt;%\n  st_as_sf() %&gt;%\n  select(-c(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))\n\nZCTAs_center &lt;- ZCTAs_sf %&gt;%\n  st_transform(\"ESRI:102003\") %&gt;%\n  st_centroid() %&gt;%\n  st_transform(\"EPSG:4269\")\n\nZCTAs_centers_df &lt;- ZCTAs_center %&gt;%\n  mutate(gridid = GEOID,\n    glat = map_dbl(geometry, function(geo) st_coordinates(geo)[[2]]),\n    glon = map_dbl(geometry, function(geo) st_coordinates(geo)[[1]]),\n    glandsea = as.logical(1)) %&gt;%\n  select(gridid, glat, glon, glandsea) %&gt;%\n  st_drop_geometry() %&gt;%\n  filter(!is.na(glat))\n\nGeo-centroids\n\nggplot() + \n  geom_sf(data = ZCTAs_sf) + \n  geom_sf(data = ZCTAs_center, color = \"red\", size = 0.6) +\n  coord_sf(crs = st_crs(\"ESRI:102003\"))\n\n\n\n\n\n\n\n\nCalculated wind exposure\n\nAL092017_winds &lt;- get_grid_winds(hurr_track = AL092017_track, \n  grid_df = ZCTAs_centers_df) %&gt;%\n  rename(GEOID = gridid)\n\n\nAL092017_winds_sf &lt;- AL092017_winds %&gt;%\n  left_join(zctas(cb = FALSE, year = 2017), by = join_by(GEOID == GEOID10)) %&gt;%\n  st_as_sf() %&gt;%\n  select(-c(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))\n\nPlotted wind measures\n\nlibrary(gridExtra)\n\noutput_maps &lt;- c(\"vmax_sust\", \"vmax_gust\", \"sust_dur\", \"gust_dur\") %&gt;%\n  map(~\n    AL092017_winds_sf %&gt;%\n      ggplot() +\n        geom_sf(aes(fill = !!sym(.x)), color = NA) +\n        coord_sf(crs = st_crs(\"ESRI:102003\"))\n  )\n\ndo.call(grid.arrange, c(output_maps, ncol = 2))\n\n\n\n\n\n\n\n\n\nlibrary(arrow)\n\nAL092017_winds %&gt;%\n  write_parquet(\"output/TXLA_ZCTA_stormwindmodel.parquet\")",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>`stormwindmodel` for Harvey</span>"
+    ]
+  },
+  {
+    "objectID": "precipitation.html",
+    "href": "precipitation.html",
+    "title": "3  Precipitation",
+    "section": "",
+    "text": "3.1 Data Procurement\nDocumentation for the dataset can be found here",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Precipitation</span>"
+    ]
+  },
+  {
+    "objectID": "precipitation.html#data-procurement",
+    "href": "precipitation.html#data-procurement",
+    "title": "3  Precipitation",
+    "section": "",
+    "text": "Data was downloaded from the NOAA Global Historical Climatology Network daily FTP server.\nZCTA to County Crosswalk was downloaded from https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt\nZCTA shapefiles were downloaded for the entire US using the tigris package",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Precipitation</span>"
+    ]
+  },
+  {
+    "objectID": "precipitation.html#data-processing",
+    "href": "precipitation.html#data-processing",
+    "title": "3  Precipitation",
+    "section": "3.2 Data Processing",
+    "text": "3.2 Data Processing\nNOAA Climate Data is collected at the station level, so the primary function of this processing is to impute the precipitation for the ZCTA\n\nStation metadata was downloaded from the NOAA Global Historical Climatology Network daily FTP server and limited to TX and LA\nStation measurement data was downloaded from the NOAA Global Historical Climatology Network daily FTP server and filtered to those included in the metadata downloaded in step 1 without quality flags\n2017 ZCTAs downloaded from the US Census Cartographic Boundary Files\nThen, the ZCTAs were joined to the UDS Mapper Zip Code to ZCTA Crosswalk in order to identify Texas and Louisiana ZCTAs\nThe ZCTAs were filtered to Texas and Louisiana\nThe gstat package was used to predict inverse distance weighted predictions of precipitation at the zcta level\n\nCross validation was preformed (not shown) and optimal hyperparameters idp = 0.5 and nmax = 8 were identified",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Precipitation</span>"
+    ]
+  },
+  {
+    "objectID": "precipitation.html#output",
+    "href": "precipitation.html#output",
+    "title": "3  Precipitation",
+    "section": "3.3 Output",
+    "text": "3.3 Output\n\nTXLA_ZCTA_PRCPpred.parquet\n\nGEOID - ZCTA GEOID\nDATE - Date (YYYY-MM-DD)\nPRCPpred - Inverse Distance Weighted Daily Precipitation (mm)",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Precipitation</span>"
+    ]
+  },
+  {
+    "objectID": "precipitation.html#code",
+    "href": "precipitation.html#code",
+    "title": "3  Precipitation",
+    "section": "3.4 Code",
+    "text": "3.4 Code\nDownloaded station information\n\nlibrary(tidyverse)\n\n# Get station data for all stations in TX and LA\nTXLA_stations &lt;- read_fwf(\"https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/ghcnd-stations.txt\", \n    fwf_cols(\n      STATION = c(1, 11), \n      LATITUDE = c(13, 20), \n      LONGITUDE = c(22,30),\n      ELEVATION = c(32,37),\n      STATE = c(39,40),\n      NAME = c(42,71),\n      GSN_FLAG = c(73,75),\n      HCNCRN_FLAG = c(77, 79),\n      WMO_ID = c(81,85)\n    )\n  ) %&gt;%\n  filter(STATE %in% c(\"TX\", \"LA\"))\n\nDownloaded the station data that is within TX and LA, in August and September 2017, and has no quality assurance flags.\n\nTXLA_station_data &lt;- read_csv(\"https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_year/2017.csv.gz\",\n    col_names = c(\"STATION\", \"DATE\", \"VAR\", \"VAL\", \"M_FLAG\", \"Q_FLAG\", \"S_FLAG\"),\n    col_types = cols_only(\n        STATION = col_character(),\n        DATE = col_date(format = \"%Y%m%d\"),\n        VAR = col_character(),\n        VAL = col_double(),\n        VAR = col_character(),\n        M_FLAG = col_character(),\n        Q_FLAG = col_character(),\n        S_FLAG = col_character(),\n    ),\n    lazy = TRUE) %&gt;%\n  filter(STATION %in% TXLA_stations$STATION) %&gt;% \n  filter(DATE %within% interval(ym(\"2017-08\"), ym(\"2017-10\")-1)) %&gt;%\n  filter(is.na(Q_FLAG)) %&gt;% # remove failed quality check measurements\n  pivot_wider(\n    id_cols = c(STATION, DATE), \n    id_expand = TRUE, \n    names_from = VAR,\n    values_from = VAL)\n\nSpatially joined stations to ZCTAs\n\nlibrary(sf)\nlibrary(tigris)\noptions(tigris_use_cache = TRUE)\n\nZCTAs &lt;- read_csv(\"https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt\") %&gt;%\n  filter(STATE %in% c(48, 22)) %&gt;%\n  distinct(ZCTA5) %&gt;%\n  rename(GEOID = ZCTA5)\n\nZCTAs_sf &lt;- ZCTAs %&gt;%\n  left_join(zctas(cb = FALSE, year = 2017), by = join_by(GEOID == GEOID10)) %&gt;%\n  st_as_sf() %&gt;%\n  select(-c(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))\n\nTXLA_stations_sf &lt;- TXLA_stations %&gt;% \n  st_as_sf(coords = c(\"LONGITUDE\", \"LATITUDE\"), crs = 4326) %&gt;%\n  st_transform(crs = st_crs(ZCTAs_sf))\n\nConducted inverse distance weighted imputation for the ZCTA\n\nlibrary(gstat)\nlibrary(furrr)\nlibrary(progressr)\n\nplan(multisession, workers = 12)\n\nwith_progress({\n  \n  p &lt;- progressor(steps = length(unique(TXLA_station_data$DATE)))\n\n  TXLA_idw_preds &lt;- unique(TXLA_station_data$DATE) %&gt;% future_map(~\n    TXLA_station_data %&gt;%\n      left_join(select(TXLA_stations_sf, STATION)) %&gt;%\n      filter(DATE == .x) %&gt;%\n      st_as_sf() %&gt;%\n      drop_na(PRCP) %&gt;%\n      gstat(data = ., formula = PRCP ~ 1, nmax = 8, set = list(idp = 0.5)) %&gt;%\n        predict(ZCTAs_sf) %&gt;% \n        st_drop_geometry() %&gt;%\n        select(var1.pred) %&gt;%\n        rename(PRCPpred = var1.pred) %&gt;%\n        bind_cols(ZCTAs_sf, DATE = as_date(.x), .) %&gt;%\n        as_tibble() %&gt;%\n        st_as_sf()) %&gt;%\n    do.call(bind_rows, .)\n\n})  \n\nCreated individual plots for each day\n\nmax &lt;- TXLA_idw_preds %&gt;%\n  st_drop_geometry() %&gt;%\n  summarize(max = max(PRCPpred)) %&gt;%\n  as.integer()\n\nplots &lt;- unique(TXLA_station_data$DATE) %&gt;% map(~\n  TXLA_idw_preds %&gt;%\n    filter(DATE == .x) %&gt;%\n    ggplot() +\n    geom_sf(aes(fill = PRCPpred), color = \"white\", linewidth = 0) +\n    coord_sf(datum = \"ESRI:102003\") +\n    scale_fill_distiller(\n      limits = c(0, max),\n      palette = \"RdYlGn\",\n      name = \"Precipitation (mm)\",\n      guide = guide_colorbar(\n        direction = \"horizontal\",\n        title.position = \"top\")) +\n    theme_void() +\n    theme(\n      plot.title = element_text(face = \"bold\", size = 24),\n      plot.subtitle = element_text(face = \"bold\", size = 20),\n      plot.caption = element_text(size = 18, hjust = 0),\n      legend.title = element_text(face = \"bold\", size = 20),\n      legend.text = element_text(face = \"bold\", size = 20),\n      legend.title.align=0.5,\n      legend.position = \"bottom\",\n      legend.key.width = unit(dev.size()[1] / 10, \"inches\")) +\n    labs(\n      title = str_c(\"Inverse Distance Weighted Precipitation by ZCTA \", .x), \n      subtitle = \"Texas and Louisiana\",\n      caption = \"Author: Ryan Zomorrodi\\nDate: 3/28/2024\\nSource: NOAA Global Historical Climatology Network - Daily\"))\n\nStitched images into a gif\n\n\nlibrary(arrow)\n\nTXLA_idw_preds %&gt;%\n  st_drop_geometry() %&gt;%\n  write_parquet(\"output/TXLA_ZCTA_PRCPpred.parquet\")",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Precipitation</span>"
+    ]
+  },
+  {
+    "objectID": "distance.html",
+    "href": "distance.html",
+    "title": "4  Distance from Storm Track",
+    "section": "",
+    "text": "4.1 Data Procurement",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Distance from Storm Track</span>"
+    ]
+  },
+  {
+    "objectID": "distance.html#data-procurement",
+    "href": "distance.html#data-procurement",
+    "title": "4  Distance from Storm Track",
+    "section": "",
+    "text": "Hurricane track data was downloaded from the hurricaneexposuredata package using the data(\"hurr_tracks\") command. This data originates from the HURDAT2.\nZCTA to County Crosswalk was downloaded from https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt\nZCTA shapefiles were downloaded for the entire US using the tigris package",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Distance from Storm Track</span>"
+    ]
+  },
+  {
+    "objectID": "distance.html#data-processing",
+    "href": "distance.html#data-processing",
+    "title": "4  Distance from Storm Track",
+    "section": "4.2 Data Processing",
+    "text": "4.2 Data Processing\n\nHurricane data was downloaded using hurricaneexposuredata package using the data(\"hurr_tracks\") command and filtered using the Harvey Automated Tropical Cyclone Forecasting code (AL092017)\nSeparately, 2017 ZCTAs downloaded from the US Census Cartographic Boundary Files\nThen, the ZCTAs were joined to the US Census ZCTA to County Crosswalk in order to identify Texas and Louisiana ZCTAs\nThe ZCTAs were filtered to Texas and Louisiana\nZCTA geo centroid were calculated\nThe shortest distance from the geo centroid for each ZCTA to the hurricane track is calculated",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Distance from Storm Track</span>"
+    ]
+  },
+  {
+    "objectID": "distance.html#output",
+    "href": "distance.html#output",
+    "title": "4  Distance from Storm Track",
+    "section": "4.3 Output",
+    "text": "4.3 Output\n\nTXLA_ZCTA_dist2track.parquet\n\nDownloaded hurricane track for Hurricane Harvey\n\nlibrary(hurricaneexposuredata)\nlibrary(sf)\nlibrary(tidyverse)\n\ndata(\"hurr_tracks\")\n\nAL092017_track &lt;- hurr_tracks %&gt;%\n  filter(usa_atcf_id == \"AL092017\") %&gt;%\n  mutate(date = as_datetime(date, format = \"%Y%m%d%H%M\")) %&gt;%\n  arrange(date) %&gt;%\n  st_as_sf(coords = c(\"longitude\", \"latitude\"), crs = \"epsg:4269\") %&gt;%\n  st_combine() %&gt;%\n  st_cast(\"LINESTRING\")\n\nDownloaded ZCTA shapefiles and calculated centroids\n\nlibrary(tigris)\n\nZCTAs &lt;- read_csv(\"https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt\") %&gt;%\n  filter(STATE %in% c(48, 22)) %&gt;%\n  distinct(ZCTA5) %&gt;%\n  rename(GEOID = ZCTA5)\n\nZCTAs_sf &lt;- ZCTAs %&gt;%\n  left_join(zctas(cb = FALSE, year = 2017), by = join_by(GEOID == GEOID10)) %&gt;%\n  st_as_sf() %&gt;%\n  select(-c(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))\n\nZCTAs_center &lt;- ZCTAs_sf %&gt;%\n  st_transform(\"ESRI:102003\") %&gt;%\n  st_centroid() %&gt;%\n  st_transform(\"EPSG:4269\")\n\nCalculated shortest distance to track from geo centroids\n\nTXLA_dist2track &lt;- ZCTAs_center %&gt;%\n  bind_cols(st_distance(., AL092017_track)) %&gt;%\n  rename(dist2track = `...3`) %&gt;%\n  st_drop_geometry()\n\n\nTXLA_dist2track %&gt;%\n  left_join(ZCTAs_sf) %&gt;%\n  st_as_sf() %&gt;%\n  ggplot() +\n    geom_sf(aes(fill = dist2track)) +\n    geom_sf(data = st_crop(AL092017_track, st_bbox(ZCTAs_sf))) +\n    coord_sf(datum = \"ESRI:102003\") +\n    scale_fill_distiller(\n      palette = \"Oranges\",\n      name = \"Smallest Distance to Hurricane Track\",\n      direction = 1,\n      guide = guide_colorbar(\n        direction = \"horizontal\",\n        title.position = \"top\")) +\n    theme_void() +\n    theme(\n      plot.title = element_text(face = \"bold\", size = 16),\n      plot.subtitle = element_text(face = \"bold\", size = 12),\n      plot.caption = element_text(size = 10, hjust = 0),\n      legend.title = element_text(face = \"bold\", size = 12),\n      legend.text = element_text(face = \"bold\", size = 12),\n      legend.title.align=0.5,\n      legend.position = \"bottom\",\n      legend.key.width = unit(dev.size()[1] / 10, \"inches\")) +\n    labs(\n      title = \"Smallest Distance to Hurricane Track by ZCTA \", \n      subtitle = \"Texas and Louisiana\",\n      caption = \"Author: Ryan Zomorrodi\\nDate: 4/1/2024\\nSource: hurricaneexposuredata\")\n\n\n\n\n\n\n\n\n\nlibrary(arrow)\n\nTXLA_dist2track %&gt;%\n  write_parquet(\"output/TXLA_ZCTA_dist2track.parquet\")",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Distance from Storm Track</span>"
+    ]
+  },
+  {
+    "objectID": "svi.html",
+    "href": "svi.html",
+    "title": "5  Social Vulnerability Index",
+    "section": "",
+    "text": "5.1 Data Procurement",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>Social Vulnerability Index</span>"
+    ]
+  },
+  {
+    "objectID": "svi.html#data-procurement",
+    "href": "svi.html#data-procurement",
+    "title": "5  Social Vulnerability Index",
+    "section": "",
+    "text": "Raw 2015-2019 ACS data used for calculations were downloaded from the findSVI package using the tidycensus dependency.\n\nZCTA to County Crosswalk was downloaded from https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>Social Vulnerability Index</span>"
+    ]
+  },
+  {
+    "objectID": "svi.html#data-processing",
+    "href": "svi.html#data-processing",
+    "title": "5  Social Vulnerability Index",
+    "section": "5.2 Data Processing",
+    "text": "5.2 Data Processing\nThe findSVI package calculates SVI percentiles for a geography of choice. In this case, we used ZCTAs.\n\nThe find_svi command was used to both download 2015-2019 ACS data at the ZCTA level and calculate the SVI quartiles as according to the CDC/ASTDR SVI documentation.\nUtilizing the ZCTA to county crosswalk, which contains a list of every ZCTA and its intersecting states, the find_svi results were limited to those ZCTAs which intersect with Texas and Louisiana\nResults were output to a parquet\n\nMore information about the findSVI package can be found here.",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>Social Vulnerability Index</span>"
+    ]
+  },
+  {
+    "objectID": "svi.html#data-output",
+    "href": "svi.html#data-output",
+    "title": "5  Social Vulnerability Index",
+    "section": "5.3 Data Output",
+    "text": "5.3 Data Output\n\nTXLA_ZCTA_SVI1519.parquet",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>Social Vulnerability Index</span>"
+    ]
+  },
+  {
+    "objectID": "svi.html#code",
+    "href": "svi.html#code",
+    "title": "5  Social Vulnerability Index",
+    "section": "5.4 Code",
+    "text": "5.4 Code\nThe variables used in this calculation are as follows:\nlibrary(findSVI)\nlibrary(tidycensus)\nlibrary(tidyverse)\n\nacs2019vars &lt;- c(\"acs5\", \"acs5/subject\", \"acs5/profile\", \"acs5/cprofile\") %&gt;%\n  map_df(~ load_variables(2019, .x) %&gt;% mutate(table = .x)) %&gt;%\n  select(-concept, -geography)\n\ncensus_variables_2019 %&gt;% \n  map(~ filter(acs2019vars, name %in% str_sub(.x, end = -2))) %&gt;%\n  map(knitr::kable)\n$t0\n\n\n\n\n\n\n\n\nname\nlabel\ntable\n\n\n\n\nS0601_C01_001\nEstimate!!Total!!Total population\nacs5/subject\n\n\nDP02_0001\nEstimate!!HOUSEHOLDS BY TYPE!!Total households\nacs5/profile\n\n\nDP04_0001\nEstimate!!HOUSING OCCUPANCY!!Total housing units\nacs5/profile\n\n\n\n$t1\n\n\n\n\n\n\n\n\nname\nlabel\ntable\n\n\n\n\nB06009_002\nEstimate!!Total:!!Less than high school graduate\nacs5\n\n\nS0601_C01_033\nEstimate!!Total!!EDUCATIONAL ATTAINMENT!!Population 25 years and over!!Less than high school graduate\nacs5/subject\n\n\nS1701_C01_001\nEstimate!!Total!!Population for whom poverty status is determined\nacs5/subject\n\n\nS1701_C01_040\nEstimate!!Total!!Population for whom poverty status is determined!!ALL INDIVIDUALS WITH INCOME BELOW THE FOLLOWING POVERTY RATIOS!!150 percent of poverty level\nacs5/subject\n\n\nS2503_C01_001\nEstimate!!Occupied housing units!!Occupied housing units\nacs5/subject\n\n\nS2503_C01_028\nEstimate!!Occupied housing units!!Occupied housing units!!MONTHLY HOUSING COSTS AS A PERCENTAGE OF HOUSEHOLD INCOME IN THE PAST 12 MONTHS!!Less than $20,000!!30 percent or more\nacs5/subject\n\n\nS2503_C01_032\nEstimate!!Occupied housing units!!Occupied housing units!!MONTHLY HOUSING COSTS AS A PERCENTAGE OF HOUSEHOLD INCOME IN THE PAST 12 MONTHS!!$20,000 to $34,999!!30 percent or more\nacs5/subject\n\n\nS2503_C01_036\nEstimate!!Occupied housing units!!Occupied housing units!!MONTHLY HOUSING COSTS AS A PERCENTAGE OF HOUSEHOLD INCOME IN THE PAST 12 MONTHS!!$35,000 to $49,999!!30 percent or more\nacs5/subject\n\n\nS2503_C01_040\nEstimate!!Occupied housing units!!Occupied housing units!!MONTHLY HOUSING COSTS AS A PERCENTAGE OF HOUSEHOLD INCOME IN THE PAST 12 MONTHS!!$50,000 to $74,999!!30 percent or more\nacs5/subject\n\n\nS2701_C04_001\nEstimate!!Uninsured!!Civilian noninstitutionalized population\nacs5/subject\n\n\nS2701_C05_001\nEstimate!!Percent Uninsured!!Civilian noninstitutionalized population\nacs5/subject\n\n\nDP03_0005\nEstimate!!EMPLOYMENT STATUS!!Population 16 years and over!!In labor force!!Civilian labor force!!Unemployed\nacs5/profile\n\n\nDP03_0009P\nPercent!!EMPLOYMENT STATUS!!Civilian labor force!!Unemployment Rate\nacs5/profile\n\n\n\n$t2\n\n\n\n\n\n\n\n\nname\nlabel\ntable\n\n\n\n\nB09001_001\nEstimate!!Total:\nacs5\n\n\nB11012_010\nEstimate!!Total:!!Female householder, no spouse or partner present:!!With own children under 18 years\nacs5\n\n\nB11012_015\nEstimate!!Total:!!Male householder, no spouse or partner present:!!With own children under 18 years\nacs5\n\n\nB16005_001\nEstimate!!Total:\nacs5\n\n\nB16005_007\nEstimate!!Total:!!Native:!!Speak Spanish:!!Speak English “not well”\nacs5\n\n\nB16005_008\nEstimate!!Total:!!Native:!!Speak Spanish:!!Speak English “not at all”\nacs5\n\n\nB16005_012\nEstimate!!Total:!!Native:!!Speak other Indo-European languages:!!Speak English “not well”\nacs5\n\n\nB16005_013\nEstimate!!Total:!!Native:!!Speak other Indo-European languages:!!Speak English “not at all”\nacs5\n\n\nB16005_017\nEstimate!!Total:!!Native:!!Speak Asian and Pacific Island languages:!!Speak English “not well”\nacs5\n\n\nB16005_018\nEstimate!!Total:!!Native:!!Speak Asian and Pacific Island languages:!!Speak English “not at all”\nacs5\n\n\nB16005_022\nEstimate!!Total:!!Native:!!Speak other languages:!!Speak English “not well”\nacs5\n\n\nB16005_023\nEstimate!!Total:!!Native:!!Speak other languages:!!Speak English “not at all”\nacs5\n\n\nB16005_029\nEstimate!!Total:!!Foreign born:!!Speak Spanish:!!Speak English “not well”\nacs5\n\n\nB16005_030\nEstimate!!Total:!!Foreign born:!!Speak Spanish:!!Speak English “not at all”\nacs5\n\n\nB16005_034\nEstimate!!Total:!!Foreign born:!!Speak other Indo-European languages:!!Speak English “not well”\nacs5\n\n\nB16005_035\nEstimate!!Total:!!Foreign born:!!Speak other Indo-European languages:!!Speak English “not at all”\nacs5\n\n\nB16005_039\nEstimate!!Total:!!Foreign born:!!Speak Asian and Pacific Island languages:!!Speak English “not well”\nacs5\n\n\nB16005_040\nEstimate!!Total:!!Foreign born:!!Speak Asian and Pacific Island languages:!!Speak English “not at all”\nacs5\n\n\nB16005_044\nEstimate!!Total:!!Foreign born:!!Speak other languages:!!Speak English “not well”\nacs5\n\n\nB16005_045\nEstimate!!Total:!!Foreign born:!!Speak other languages:!!Speak English “not at all”\nacs5\n\n\nS0101_C01_030\nEstimate!!Total!!Total population!!SELECTED AGE CATEGORIES!!65 years and over\nacs5/subject\n\n\nS0101_C02_030\nEstimate!!Percent!!Total population!!SELECTED AGE CATEGORIES!!65 years and over\nacs5/subject\n\n\nDP02_0072\nEstimate!!DISABILITY STATUS OF THE CIVILIAN NONINSTITUTIONALIZED POPULATION!!Total Civilian Noninstitutionalized Population!!With a disability\nacs5/profile\n\n\nDP02_0072P\nPercent!!DISABILITY STATUS OF THE CIVILIAN NONINSTITUTIONALIZED POPULATION!!Total Civilian Noninstitutionalized Population!!With a disability\nacs5/profile\n\n\n\n$t3\n\n\n\n\n\n\n\n\nname\nlabel\ntable\n\n\n\n\nDP05_0071\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Hispanic or Latino (of any race)\nacs5/profile\n\n\nDP05_0078\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Black or African American alone\nacs5/profile\n\n\nDP05_0079\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!American Indian and Alaska Native alone\nacs5/profile\n\n\nDP05_0080\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Asian alone\nacs5/profile\n\n\nDP05_0081\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Native Hawaiian and Other Pacific Islander alone\nacs5/profile\n\n\nDP05_0082\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Some other race alone\nacs5/profile\n\n\nDP05_0083\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Two or more races\nacs5/profile\n\n\n\n$t4\n\n\n\n\n\n\n\n\nname\nlabel\ntable\n\n\n\n\nB26001_001\nEstimate!!Total:\nacs5\n\n\nDP04_0002\nEstimate!!HOUSING OCCUPANCY!!Total housing units!!Occupied housing units\nacs5/profile\n\n\nDP04_0012\nEstimate!!UNITS IN STRUCTURE!!Total housing units!!10 to 19 units\nacs5/profile\n\n\nDP04_0013\nEstimate!!UNITS IN STRUCTURE!!Total housing units!!20 or more units\nacs5/profile\n\n\nDP04_0014\nEstimate!!UNITS IN STRUCTURE!!Total housing units!!Mobile home\nacs5/profile\n\n\nDP04_0014P\nPercent!!UNITS IN STRUCTURE!!Total housing units!!Mobile home\nacs5/profile\n\n\nDP04_0058\nEstimate!!VEHICLES AVAILABLE!!Occupied housing units!!No vehicles available\nacs5/profile\n\n\nDP04_0058P\nPercent!!VEHICLES AVAILABLE!!Occupied housing units!!No vehicles available\nacs5/profile\n\n\nDP04_0078\nEstimate!!OCCUPANTS PER ROOM!!Occupied housing units!!1.01 to 1.50\nacs5/profile\n\n\nDP04_0079\nEstimate!!OCCUPANTS PER ROOM!!Occupied housing units!!1.51 or more\nacs5/profile\n\n\n\n$t5\n\n\n\n\n\n\n\n\nname\nlabel\ntable\n\n\n\n\nS2802_C01_001\nEstimate!!Total!!Total population in households\nacs5/subject\n\n\nS2802_C02_001\nEstimate!!Broadband Internet Subscription!!With a computer!!Total population in households\nacs5/subject\n\n\nDP05_0071\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Hispanic or Latino (of any race)\nacs5/profile\n\n\nDP05_0071P\nPercent!!HISPANIC OR LATINO AND RACE!!Total population!!Hispanic or Latino (of any race)\nacs5/profile\n\n\nDP05_0078\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Black or African American alone\nacs5/profile\n\n\nDP05_0078P\nPercent!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Black or African American alone\nacs5/profile\n\n\nDP05_0079\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!American Indian and Alaska Native alone\nacs5/profile\n\n\nDP05_0079P\nPercent!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!American Indian and Alaska Native alone\nacs5/profile\n\n\nDP05_0080\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Asian alone\nacs5/profile\n\n\nDP05_0080P\nPercent!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Asian alone\nacs5/profile\n\n\nDP05_0081\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Native Hawaiian and Other Pacific Islander alone\nacs5/profile\n\n\nDP05_0081P\nPercent!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Native Hawaiian and Other Pacific Islander alone\nacs5/profile\n\n\nDP05_0082\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Some other race alone\nacs5/profile\n\n\nDP05_0082P\nPercent!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Some other race alone\nacs5/profile\n\n\nDP05_0083\nEstimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Two or more races\nacs5/profile\n\n\nDP05_0083P\nPercent!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Two or more races\nacs5/profile\n\n\n\nThis single command downloads the 2015-2019 ACS5 at the zcta level and calculates the SVI theme percentiles for the entire country\n\nsvi &lt;- find_svi(year = 2019, geography = \"zcta\", full.table = TRUE)\n\nCalculated SVI is filtered to the state of Texas (FIPS: 48) and Louisiana (FIPS: 22)\n\nlibrary(sf)\nlibrary(tigris)\n\nZCTAs &lt;- read_csv(\"https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt\") %&gt;%\n  filter(STATE %in% c(48, 22)) %&gt;%\n  distinct(ZCTA5) %&gt;%\n  rename(GEOID = ZCTA5)\n\nZCTAs_sf &lt;- ZCTAs %&gt;%\n  left_join(zctas(cb = FALSE, year = 2017), by = join_by(GEOID == GEOID10)) %&gt;%\n  st_as_sf() %&gt;%\n  select(-c(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))\n\nTXLA_svi &lt;- svi %&gt;%\n  filter(GEOID %in% unlist(ZCTAs)) %&gt;%\n  select(-c(year, state)) %&gt;%\n  mutate(across(starts_with(\"E_\"), as.integer))\n\n\nlibrary(gridExtra)\n\noutput_maps &lt;- colnames(TXLA_svi) %&gt;% \n  `[`(str_detect(., \"theme\")) %&gt;%\n  map(~\n    TXLA_svi %&gt;% \n    left_join(ZCTAs_sf) %&gt;%\n    st_as_sf() %&gt;%\n    ggplot() +\n      geom_sf(aes(fill = !!sym(.x)), linewidth = 0, color = NA) +\n      coord_sf(datum = \"ESRI:102003\") +\n      scale_fill_distiller(\n        palette = \"BuPu\",\n        guide = guide_colorbar(\n          direction = \"horizontal\",\n          title.position = \"top\")) +\n      theme_void() +\n      theme(\n        plot.title = element_text(face = \"bold\", size = 16),\n        plot.subtitle = element_text(face = \"bold\", size = 12),\n        plot.caption = element_text(size = 10, hjust = 0),\n        legend.title = element_text(face = \"bold\", size = 12),\n        legend.text = element_text(face = \"bold\", size = 12),\n        legend.title.align=0.5,\n        legend.position = \"bottom\",\n        legend.key.width = unit(dev.size()[1] / 20, \"inches\")) +\n      labs(\n        caption = \"Author: Ryan Zomorrodi\\nDate: 4/1/2024\\nSource: FEMA National Flood Hazard Layer\")\n  )\n\ndo.call(grid.arrange, c(output_maps, ncol = 2))\n\n\n\n\n\n\n\n\nOutputed SVI to parquet.\n\nlibrary(arrow)\n\nTXLA_svi %&gt;%\n  write_parquet(\"output/TXLA_ZCTA_SVI1519.parquet\")",
+    "crumbs": [
+      "Measure Calculations",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>Social Vulnerability Index</span>"
+    ]
+  }
+]

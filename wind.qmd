@@ -1,0 +1,132 @@
+---
+execute:
+  warning: false
+  error: false
+  cache: true
+---
+
+# `stormwindmodel` for Harvey
+
+## Data Procurement
+
+*   Hurricane track data was downloaded from the `hurricaneexposuredata` package using the `data("hurr_tracks")` command. This data originates from the [HURDAT2](https://www.nhc.noaa.gov/data/).
+*   ZCTA to County Crosswalk was downloaded from <https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt>
+*   ZCTA shapefiles were downloaded for the entire US using the `tigris` package
+
+A vignette for the `hurricaneexposuredata` package can be found [here](https://cran.r-project.org/web/packages/hurricaneexposure/vignettes/hurricaneexposure.html)
+
+## Data Processing
+
+The `stormwindmodel` estimates wind exposure for points. In this case we used wind exposure at ZCTA geometric centroids to estimate wind exposure for the entire ZCTA.
+
+1.  Hurricane data was downloaded using `hurricaneexposuredata` package using the `data("hurr_tracks")` command and filtered using the Harvey Automated Tropical Cyclone Forecasting code (AL092017)
+2.  Separately, 2017 ZCTAs downloaded from the [US Census Cartographic Boundary Files](https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.2017.html#list-tab-1556094155)
+3.  Then, the ZCTAs were joined to the [US Census ZCTA to County Crosswalk](https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt) in order to identify Texas and Louisiana ZCTAs
+4.  The ZCTAs were filtered to Texas and Louisiana
+5.  Geometrics centroids were calculated for each ZCTA
+6.  The `get_grid_winds` command was used to calculate wind exposure for each centroid. It works by
+    a.  Imputing the hurricane track to every 15 minutes
+    b.  Adding the wind radii from the [HURDAT2](https://www.nhc.noaa.gov/data/)
+    c.  Modeling wind exposure for each point
+
+More information about the `stormwindmodel` package and variables calculated are included in this [vignette](https://cran.r-hub.io/web/packages/stormwindmodel/vignettes/Details.html)
+
+## Output
+
+-   `TXLA_ZCTA_AL092017_stormwindmodel.parquet`
+    -   **GEOID** - ZCTA
+    -   **date_time_max_wind** - date & time where maximum wind was sustained
+    -   **vmax_sust** - Maximum 10-m 1-min sustained wind for the tropical cyclone (m/s)
+    -   **vmax_gust** - Max 10-m 1-min gust wind experienced at grid point (m/s)
+    -   **sust_dur** - Duration of time a certain sustained wind was experienced at grid point (minutes)
+    -   **gust_dur** - Duration of time a certain gust wind was experienced at grid point (minutes)
+
+## Code
+Storm track data is filtered for Hurricane Harvey
+```{r}
+library(hurricaneexposuredata)
+library(stormwindmodel)
+library(tidyverse)
+
+data("hurr_tracks")
+
+AL092017_track <- hurr_tracks %>%
+  filter(usa_atcf_id == "AL092017") %>%
+  select(-c(storm_id, usa_atcf_id))
+```
+
+ZCTA geo-centoids were calculated
+```{r}
+#| output: false
+
+library(tigris)
+library(sf)
+
+ZCTAs <- read_csv("https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt") %>%
+  filter(STATE %in% c(48, 22)) %>%
+  distinct(ZCTA5) %>%
+  rename(GEOID = ZCTA5)
+
+ZCTAs_sf <- ZCTAs %>%
+  left_join(zctas(cb = FALSE, year = 2017), by = join_by(GEOID == GEOID10)) %>%
+  st_as_sf() %>%
+  select(-c(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))
+
+ZCTAs_center <- ZCTAs_sf %>%
+  st_transform("ESRI:102003") %>%
+  st_centroid() %>%
+  st_transform("EPSG:4269")
+
+ZCTAs_centers_df <- ZCTAs_center %>%
+  mutate(gridid = GEOID,
+    glat = map_dbl(geometry, function(geo) st_coordinates(geo)[[2]]),
+    glon = map_dbl(geometry, function(geo) st_coordinates(geo)[[1]]),
+    glandsea = as.logical(1)) %>%
+  select(gridid, glat, glon, glandsea) %>%
+  st_drop_geometry() %>%
+  filter(!is.na(glat))
+```
+
+Geo-centroids
+```{r}
+ggplot() + 
+  geom_sf(data = ZCTAs_sf) + 
+  geom_sf(data = ZCTAs_center, color = "red", size = 0.6) +
+  coord_sf(crs = st_crs("ESRI:102003"))
+```
+
+Calculated wind exposure
+```{r}
+AL092017_winds <- get_grid_winds(hurr_track = AL092017_track, 
+  grid_df = ZCTAs_centers_df) %>%
+  rename(GEOID = gridid)
+```
+
+```{r}
+AL092017_winds_sf <- AL092017_winds %>%
+  left_join(zctas(cb = FALSE, year = 2017), by = join_by(GEOID == GEOID10)) %>%
+  st_as_sf() %>%
+  select(-c(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))
+```
+
+Plotted wind measures
+```{r}
+library(gridExtra)
+
+output_maps <- c("vmax_sust", "vmax_gust", "sust_dur", "gust_dur") %>%
+  map(~
+    AL092017_winds_sf %>%
+      ggplot() +
+        geom_sf(aes(fill = !!sym(.x)), color = NA) +
+        coord_sf(crs = st_crs("ESRI:102003"))
+  )
+
+do.call(grid.arrange, c(output_maps, ncol = 2))
+```
+
+```{r}
+library(arrow)
+
+AL092017_winds %>%
+  write_parquet("output/TXLA_ZCTA_stormwindmodel.parquet")
+```

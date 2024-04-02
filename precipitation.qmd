@@ -1,0 +1,248 @@
+---
+execute:
+  warning: false
+  error: false
+---
+
+# Precipitation
+
+## Data Procurement 
+
+*   Data was downloaded from the [NOAA Global Historical Climatology Network daily](https://www.ncei.noaa.gov/products/land-based-station/global-historical-climatology-network-daily) FTP server. 
+*   ZCTA to County Crosswalk was downloaded from [https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt](https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt)
+*   ZCTA shapefiles were downloaded for the entire US using the `tigris` package
+
+
+Documentation for the dataset can be found [here](https://www.ncei.noaa.gov/pub/data/cdo/documentation/GHCND_documentation.pdf)
+
+## Data Processing
+NOAA Climate Data is collected at the station level, so the primary function of this processing is to impute the precipitation for the ZCTA 
+
+1.  Station metadata was downloaded from the [NOAA Global Historical Climatology Network daily](https://www.ncei.noaa.gov/products/land-based-station/global-historical-climatology-network-daily) FTP server and limited to TX and LA
+2.  Station measurement data was downloaded from the [NOAA Global Historical Climatology Network daily](https://www.ncei.noaa.gov/products/land-based-station/global-historical-climatology-network-daily) FTP server and filtered to those included in the metadata downloaded in step 1 without quality flags
+3.  2017 ZCTAs downloaded from the [US Census Cartographic Boundary Files](https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.2017.html#list-tab-1556094155)
+4.  Then, the ZCTAs were joined to the [UDS Mapper Zip Code to ZCTA Crosswalk](https://udsmapper.org/zip-code-to-zcta-crosswalk/) in order to identify Texas and Louisiana ZCTAs
+5.  The ZCTAs were filtered to Texas and Louisiana
+6.  The `gstat` package was used to predict inverse distance weighted predictions of precipitation at the zcta level
+    a.  Cross validation was preformed (not shown) and optimal hyperparameters idp = 0.5 and nmax = 8 were identified
+
+## Output
+* `TXLA_ZCTA_PRCPpred.parquet`
+    -   **GEOID** - ZCTA GEOID
+    -   **DATE** - Date (YYYY-MM-DD)
+    -   **PRCPpred** - Inverse Distance Weighted Daily Precipitation (mm)
+
+## Code
+
+Downloaded station information 
+``` {r}
+library(tidyverse)
+
+# Get station data for all stations in TX and LA
+TXLA_stations <- read_fwf("https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/ghcnd-stations.txt", 
+    fwf_cols(
+      STATION = c(1, 11), 
+      LATITUDE = c(13, 20), 
+      LONGITUDE = c(22,30),
+      ELEVATION = c(32,37),
+      STATE = c(39,40),
+      NAME = c(42,71),
+      GSN_FLAG = c(73,75),
+      HCNCRN_FLAG = c(77, 79),
+      WMO_ID = c(81,85)
+    )
+  ) %>%
+  filter(STATE %in% c("TX", "LA"))
+```
+
+Downloaded the station data that is within TX and LA, in August and September 2017, and has no quality assurance flags.
+``` {r}
+TXLA_station_data <- read_csv("https://www.ncei.noaa.gov/pub/data/ghcn/daily/by_year/2017.csv.gz",
+    col_names = c("STATION", "DATE", "VAR", "VAL", "M_FLAG", "Q_FLAG", "S_FLAG"),
+    col_types = cols_only(
+        STATION = col_character(),
+        DATE = col_date(format = "%Y%m%d"),
+        VAR = col_character(),
+        VAL = col_double(),
+        VAR = col_character(),
+        M_FLAG = col_character(),
+        Q_FLAG = col_character(),
+        S_FLAG = col_character(),
+    ),
+    lazy = TRUE) %>%
+  filter(STATION %in% TXLA_stations$STATION) %>% 
+  filter(DATE %within% interval(ym("2017-08"), ym("2017-10")-1)) %>%
+  filter(is.na(Q_FLAG)) %>% # remove failed quality check measurements
+  pivot_wider(
+    id_cols = c(STATION, DATE), 
+    id_expand = TRUE, 
+    names_from = VAR,
+    values_from = VAL)
+```
+
+Spatially joined stations to ZCTAs
+``` {r}
+#| output: false
+
+library(sf)
+library(tigris)
+options(tigris_use_cache = TRUE)
+
+ZCTAs <- read_csv("https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt") %>%
+  filter(STATE %in% c(48, 22)) %>%
+  distinct(ZCTA5) %>%
+  rename(GEOID = ZCTA5)
+
+ZCTAs_sf <- ZCTAs %>%
+  left_join(zctas(cb = FALSE, year = 2017), by = join_by(GEOID == GEOID10)) %>%
+  st_as_sf() %>%
+  select(-c(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))
+
+TXLA_stations_sf <- TXLA_stations %>% 
+  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326) %>%
+  st_transform(crs = st_crs(ZCTAs_sf))
+```
+
+ 
+```{r}
+#| include: false
+#| eval: false
+
+library(gstat)
+library(furrr)
+library(progressr)
+
+plan(multisession, workers = 8)
+
+with_progress({
+  hyperparameters <- bind_cols(
+    idp = sort(unique(c(seq(1 ,3, 1/3), seq(1/3 , 1, 1/9)))) ,
+    nmax = 1:13
+  ) %>% complete(idp, nmax)
+  
+  p <- progressor(steps = nrow(hyperparameters))
+  
+  result <- future_pmap(hyperparameters, function(idp, nmax) {
+    TXLA_station_data %>%
+      left_join(select(TXLA_stations_sf, STATION), by = join_by(STATION)) %>%
+      filter(DATE == "2017-08-27") %>%
+      st_as_sf() %>%
+      drop_na(PRCP) %>%
+      gstat(data = ., formula = PRCP ~ 1, nmax = nmax, set = list(idp = idp)) %>%
+        gstat.cv(verbose = FALSE, debug.level = 0) %>% 
+        as_tibble() %>%
+        summarize(idp = idp, nmax = nmax, RMSE = sqrt(mean(residual^2)))
+  })
+})
+
+result %>% 
+  do.call(bind_rows, .) %>%
+  arrange(RMSE)
+```
+
+Conducted inverse distance weighted imputation for the ZCTA
+```{r}
+#| eval: false
+
+library(gstat)
+library(furrr)
+library(progressr)
+
+plan(multisession, workers = 12)
+
+with_progress({
+  
+  p <- progressor(steps = length(unique(TXLA_station_data$DATE)))
+
+  TXLA_idw_preds <- unique(TXLA_station_data$DATE) %>% future_map(~
+    TXLA_station_data %>%
+      left_join(select(TXLA_stations_sf, STATION)) %>%
+      filter(DATE == .x) %>%
+      st_as_sf() %>%
+      drop_na(PRCP) %>%
+      gstat(data = ., formula = PRCP ~ 1, nmax = 8, set = list(idp = 0.5)) %>%
+        predict(ZCTAs_sf) %>% 
+        st_drop_geometry() %>%
+        select(var1.pred) %>%
+        rename(PRCPpred = var1.pred) %>%
+        bind_cols(ZCTAs_sf, DATE = as_date(.x), .) %>%
+        as_tibble() %>%
+        st_as_sf()) %>%
+    do.call(bind_rows, .)
+
+})  
+```
+
+```{r}
+#| include: false
+
+load("TXLA_idw_preds.Rdata")
+```
+
+Created individual plots for each day
+```{r}
+max <- TXLA_idw_preds %>%
+  st_drop_geometry() %>%
+  summarize(max = max(PRCPpred)) %>%
+  as.integer()
+
+plots <- unique(TXLA_station_data$DATE) %>% map(~
+  TXLA_idw_preds %>%
+    filter(DATE == .x) %>%
+    ggplot() +
+    geom_sf(aes(fill = PRCPpred), color = "white", linewidth = 0) +
+    coord_sf(datum = "ESRI:102003") +
+    scale_fill_distiller(
+      limits = c(0, max),
+      palette = "RdYlGn",
+      name = "Precipitation (mm)",
+      guide = guide_colorbar(
+        direction = "horizontal",
+        title.position = "top")) +
+    theme_void() +
+    theme(
+      plot.title = element_text(face = "bold", size = 24),
+      plot.subtitle = element_text(face = "bold", size = 20),
+      plot.caption = element_text(size = 18, hjust = 0),
+      legend.title = element_text(face = "bold", size = 20),
+      legend.text = element_text(face = "bold", size = 20),
+      legend.title.align=0.5,
+      legend.position = "bottom",
+      legend.key.width = unit(dev.size()[1] / 10, "inches")) +
+    labs(
+      title = str_c("Inverse Distance Weighted Precipitation by ZCTA ", .x), 
+      subtitle = "Texas and Louisiana",
+      caption = "Author: Ryan Zomorrodi\nDate: 3/28/2024\nSource: NOAA Global Historical Climatology Network - Daily"))
+```
+
+Stitched images into a gif
+```{r}
+#| include: false
+#| eval: false
+
+library(magick)
+
+files <- map(unique(TXLA_station_data$DATE), ~
+  file.path(tempdir(), str_c(.x, ".png")))
+
+plan(multisession, workers = 20)
+
+unlist(files)[20:40] %>%
+  map2(plots[20:40], ~ ggsave(.x, .y))
+
+unlist(files)[20:40] %>%
+  image_read() %>%
+  image_join() %>%
+  image_animate(fps = 2) %>%
+  image_write("output/TXLA_ZCTA_PRCPpred.gif")
+```
+![](output/TXLA_ZCTA_PRCPpred.gif)
+
+
+```{r}
+library(arrow)
+
+TXLA_idw_preds %>%
+  st_drop_geometry() %>%
+  write_parquet("output/TXLA_ZCTA_PRCPpred.parquet")
+```

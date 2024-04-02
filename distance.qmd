@@ -1,0 +1,113 @@
+---
+execute:
+  warning: false
+  error: false
+  cache: true
+---
+
+# Distance from Storm Track
+
+## Data Procurement
+
+*   Hurricane track data was downloaded from the `hurricaneexposuredata` package using the `data("hurr_tracks")` command. This data originates from the [HURDAT2](https://www.nhc.noaa.gov/data/).
+*   ZCTA to County Crosswalk was downloaded from <https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt>
+*   ZCTA shapefiles were downloaded for the entire US using the `tigris` package
+
+## Data Processing
+
+1.  Hurricane data was downloaded using `hurricaneexposuredata` package using the `data("hurr_tracks")` command and filtered using the Harvey Automated Tropical Cyclone Forecasting code (AL092017)
+2.  Separately, 2017 ZCTAs downloaded from the [US Census Cartographic Boundary Files](https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.2017.html#list-tab-1556094155)
+3.  Then, the ZCTAs were joined to the [US Census ZCTA to County Crosswalk](https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt) in order to identify Texas and Louisiana ZCTAs
+4.  The ZCTAs were filtered to Texas and Louisiana
+5.  ZCTA geo centroid were calculated
+6.  The shortest distance from the geo centroid for each ZCTA to the hurricane track is calculated
+
+## Output
+
+-   `TXLA_ZCTA_dist2track.parquet`
+
+Downloaded hurricane track for Hurricane Harvey
+```{r}
+library(hurricaneexposuredata)
+library(sf)
+library(tidyverse)
+
+data("hurr_tracks")
+
+AL092017_track <- hurr_tracks %>%
+  filter(usa_atcf_id == "AL092017") %>%
+  mutate(date = as_datetime(date, format = "%Y%m%d%H%M")) %>%
+  arrange(date) %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = "epsg:4269") %>%
+  st_combine() %>%
+  st_cast("LINESTRING")
+```
+
+Downloaded ZCTA shapefiles and calculated centroids
+```{r}
+#| output: false
+
+library(tigris)
+
+ZCTAs <- read_csv("https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt") %>%
+  filter(STATE %in% c(48, 22)) %>%
+  distinct(ZCTA5) %>%
+  rename(GEOID = ZCTA5)
+
+ZCTAs_sf <- ZCTAs %>%
+  left_join(zctas(cb = FALSE, year = 2017), by = join_by(GEOID == GEOID10)) %>%
+  st_as_sf() %>%
+  select(-c(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))
+
+ZCTAs_center <- ZCTAs_sf %>%
+  st_transform("ESRI:102003") %>%
+  st_centroid() %>%
+  st_transform("EPSG:4269")
+```
+
+Calculated shortest distance to track from geo centroids
+```{r}
+TXLA_dist2track <- ZCTAs_center %>%
+  bind_cols(st_distance(., AL092017_track)) %>%
+  rename(dist2track = `...3`) %>%
+  st_drop_geometry()
+```
+
+```{r}
+TXLA_dist2track %>%
+  left_join(ZCTAs_sf) %>%
+  st_as_sf() %>%
+  ggplot() +
+    geom_sf(aes(fill = dist2track)) +
+    geom_sf(data = st_crop(AL092017_track, st_bbox(ZCTAs_sf))) +
+    coord_sf(datum = "ESRI:102003") +
+    scale_fill_distiller(
+      palette = "Oranges",
+      name = "Smallest Distance to Hurricane Track",
+      direction = 1,
+      guide = guide_colorbar(
+        direction = "horizontal",
+        title.position = "top")) +
+    theme_void() +
+    theme(
+      plot.title = element_text(face = "bold", size = 16),
+      plot.subtitle = element_text(face = "bold", size = 12),
+      plot.caption = element_text(size = 10, hjust = 0),
+      legend.title = element_text(face = "bold", size = 12),
+      legend.text = element_text(face = "bold", size = 12),
+      legend.title.align=0.5,
+      legend.position = "bottom",
+      legend.key.width = unit(dev.size()[1] / 10, "inches")) +
+    labs(
+      title = "Smallest Distance to Hurricane Track by ZCTA ", 
+      subtitle = "Texas and Louisiana",
+      caption = "Author: Ryan Zomorrodi\nDate: 4/1/2024\nSource: hurricaneexposuredata")
+```
+
+
+```{r}
+library(arrow)
+
+TXLA_dist2track %>%
+  write_parquet("output/TXLA_ZCTA_dist2track.parquet")
+```
