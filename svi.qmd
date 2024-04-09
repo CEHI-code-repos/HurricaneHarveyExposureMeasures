@@ -8,20 +8,20 @@ execute:
 # Social Vulnerability Index
 
 ## Data Procurement
-*   Raw 2015-2019 ACS data used for calculations were downloaded from the `findSVI` package using the `tidycensus` dependency.  
+*   Raw 2016-2012 ACS data used for calculations were downloaded from the `findSVI` package using the `tidycensus` dependency.  
 *   ZCTA to County Crosswalk was downloaded from [https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt](https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt)
 
 ## Data Processing 
 The `findSVI` package calculates SVI percentiles for a geography of choice. In this case, we used ZCTAs.
 
-1.  The `find_svi` command was used to both download 2015-2019 ACS data at the ZCTA level and calculate the SVI quartiles as according to the CDC/ASTDR SVI documentation.
+1.  The `find_svi` command was used to both download 2012-2016 ACS data at the ZCTA level and calculate the SVI quartiles as according to the CDC/ASTDR SVI documentation.
 2.  Utilizing the ZCTA to county crosswalk, which contains a list of every ZCTA and its intersecting states, the `find_svi` results were limited to those ZCTAs which intersect with Texas and Louisiana
 3.  Results were output to a parquet
 
 More information about the `findSVI` package can be found [here](https://heli-xu.github.io/findSVI/).
 
 ## Data Output
--   `TXLA_ZCTA_SVI1519.parquet`
+-   `TXLA_ZCTA_SVI1216.parquet`
 
 ## Code
 The variables used in this calculation are as follows:
@@ -31,12 +31,12 @@ library(findSVI)
 library(tidycensus)
 library(tidyverse)
 
-acs2019vars <- c("acs5", "acs5/subject", "acs5/profile", "acs5/cprofile") %>%
-  map_df(~ load_variables(2019, .x) %>% mutate(table = .x)) %>%
+acs2016vars <- c("acs5", "acs5/subject", "acs5/profile", "acs5/cprofile") %>%
+  map_df(~ load_variables(2016, .x) %>% mutate(table = .x)) %>%
   select(-concept, -geography)
 
-census_variables_2019 %>% 
-  map(~ filter(acs2019vars, name %in% str_sub(.x, end = -2))) %>%
+census_variables_2016 %>% 
+  map(~ filter(acs2016vars, name %in% str_sub(.x, end = -2))) %>%
   map(knitr::kable)
 ```
 
@@ -45,7 +45,7 @@ census_variables_2019 %>%
 #| eval: false
 
 # this code generates the same data as get_census_data
-df <- census_variables_2019 %>% 
+df <- census_variables_2016 %>% 
   map(~ filter(acs2019vars, name %in% str_sub(.x, end = -2))) %>%
   list_rbind() %>%
   distinct() %>%
@@ -59,7 +59,7 @@ df <- census_variables_2019 %>%
 
 This single command downloads the 2015-2019 ACS5 at the zcta level and calculates the SVI theme percentiles for the entire country
 ```{r}
-svi <- find_svi(year = 2019, geography = "zcta", full.table = TRUE)
+svi <- find_svi(year = 2016, geography = "zcta", full.table = TRUE)
 ```
 
 Calculated SVI is filtered to the state of Texas (FIPS: 48) and Louisiana (FIPS: 22)
@@ -123,9 +123,8 @@ do.call(grid.arrange, c(output_maps, ncol = 2))
 
 Outputed SVI to parquet.
 ``` {r}
-#| eval: false
 library(arrow)
 
 TXLA_svi %>%
-  write_parquet("output/TXLA_ZCTA_SVI1519.parquet")
+  write_parquet("output/TXLA_ZCTA_SVI1216.parquet")
 ```

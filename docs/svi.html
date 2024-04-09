@@ -228,7 +228,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="data-procurement" class="level2" data-number="5.1">
 <h2 data-number="5.1" class="anchored" data-anchor-id="data-procurement"><span class="header-section-number">5.1</span> Data Procurement</h2>
 <ul>
-<li>Raw 2015-2019 ACS data used for calculations were downloaded from the <code>findSVI</code> package using the <code>tidycensus</code> dependency.<br>
+<li>Raw 2016-2012 ACS data used for calculations were downloaded from the <code>findSVI</code> package using the <code>tidycensus</code> dependency.<br>
 </li>
 <li>ZCTA to County Crosswalk was downloaded from <a href="https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt">https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt</a></li>
 </ul>
@@ -237,7 +237,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 data-number="5.2" class="anchored" data-anchor-id="data-processing"><span class="header-section-number">5.2</span> Data Processing</h2>
 <p>The <code>findSVI</code> package calculates SVI percentiles for a geography of choice. In this case, we used ZCTAs.</p>
 <ol type="1">
-<li>The <code>find_svi</code> command was used to both download 2015-2019 ACS data at the ZCTA level and calculate the SVI quartiles as according to the CDC/ASTDR SVI documentation.</li>
+<li>The <code>find_svi</code> command was used to both download 2012-2016 ACS data at the ZCTA level and calculate the SVI quartiles as according to the CDC/ASTDR SVI documentation.</li>
 <li>Utilizing the ZCTA to county crosswalk, which contains a list of every ZCTA and its intersecting states, the <code>find_svi</code> results were limited to those ZCTAs which intersect with Texas and Louisiana</li>
 <li>Results were output to a parquet</li>
 </ol>
@@ -246,7 +246,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="data-output" class="level2" data-number="5.3">
 <h2 data-number="5.3" class="anchored" data-anchor-id="data-output"><span class="header-section-number">5.3</span> Data Output</h2>
 <ul>
-<li><code>TXLA_ZCTA_SVI1519.parquet</code></li>
+<li><code>TXLA_ZCTA_SVI1216.parquet</code></li>
 </ul>
 </section>
 <section id="code" class="level2" data-number="5.4">
@@ -256,12 +256,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidycensus)</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>acs2019vars <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"acs5"</span>, <span class="st">"acs5/subject"</span>, <span class="st">"acs5/profile"</span>, <span class="st">"acs5/cprofile"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map_df</span>(<span class="sc">~</span> <span class="fu">load_variables</span>(<span class="dv">2019</span>, .x) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">table =</span> .x)) <span class="sc">%&gt;%</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>acs2016vars <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"acs5"</span>, <span class="st">"acs5/subject"</span>, <span class="st">"acs5/profile"</span>, <span class="st">"acs5/cprofile"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map_df</span>(<span class="sc">~</span> <span class="fu">load_variables</span>(<span class="dv">2016</span>, .x) <span class="sc">%&gt;%</span> <span class="fu">mutate</span>(<span class="at">table =</span> .x)) <span class="sc">%&gt;%</span></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>concept, <span class="sc">-</span>geography)</span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>census_variables_2019 <span class="sc">%&gt;%</span> </span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="sc">~</span> <span class="fu">filter</span>(acs2019vars, name <span class="sc">%in%</span> <span class="fu">str_sub</span>(.x, <span class="at">end =</span> <span class="sc">-</span><span class="dv">2</span>))) <span class="sc">%&gt;%</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>census_variables_2016 <span class="sc">%&gt;%</span> </span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="sc">~</span> <span class="fu">filter</span>(acs2016vars, name <span class="sc">%in%</span> <span class="fu">str_sub</span>(.x, <span class="at">end =</span> <span class="sc">-</span><span class="dv">2</span>))) <span class="sc">%&gt;%</span></span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(knitr<span class="sc">::</span>kable)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <p>$t0</p>
 <table class="table">
@@ -280,7 +280,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">S0601_C01_001</td>
-<td style="text-align: left;">Estimate!!Total!!Total population</td>
+<td style="text-align: left;">Total!!Estimate!!Total population</td>
 <td style="text-align: left;">acs5/subject</td>
 </tr>
 <tr class="even">
@@ -298,9 +298,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>$t1</p>
 <table class="table">
 <colgroup>
-<col style="width: 6%">
-<col style="width: 86%">
-<col style="width: 6%">
+<col style="width: 8%">
+<col style="width: 84%">
+<col style="width: 7%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -312,57 +312,27 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">B06009_002</td>
-<td style="text-align: left;">Estimate!!Total:!!Less than high school graduate</td>
+<td style="text-align: left;">Estimate!!Total!!Less than high school graduate</td>
+<td style="text-align: left;">acs5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">B17001_002</td>
+<td style="text-align: left;">Estimate!!Total!!Income in the past 12 months below poverty level</td>
+<td style="text-align: left;">acs5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">B19301_001</td>
+<td style="text-align: left;">Estimate!!Per capita income in the past 12 months (in 2016 inflation-adjusted dollars)</td>
 <td style="text-align: left;">acs5</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">S0601_C01_033</td>
-<td style="text-align: left;">Estimate!!Total!!EDUCATIONAL ATTAINMENT!!Population 25 years and over!!Less than high school graduate</td>
+<td style="text-align: left;">Total!!Estimate!!EDUCATIONAL ATTAINMENT!!Population 25 years and over!!Less than high school graduate</td>
 <td style="text-align: left;">acs5/subject</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">S1701_C01_001</td>
-<td style="text-align: left;">Estimate!!Total!!Population for whom poverty status is determined</td>
-<td style="text-align: left;">acs5/subject</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">S1701_C01_040</td>
-<td style="text-align: left;">Estimate!!Total!!Population for whom poverty status is determined!!ALL INDIVIDUALS WITH INCOME BELOW THE FOLLOWING POVERTY RATIOS!!150 percent of poverty level</td>
-<td style="text-align: left;">acs5/subject</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">S2503_C01_001</td>
-<td style="text-align: left;">Estimate!!Occupied housing units!!Occupied housing units</td>
-<td style="text-align: left;">acs5/subject</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">S2503_C01_028</td>
-<td style="text-align: left;">Estimate!!Occupied housing units!!Occupied housing units!!MONTHLY HOUSING COSTS AS A PERCENTAGE OF HOUSEHOLD INCOME IN THE PAST 12 MONTHS!!Less than $20,000!!30 percent or more</td>
-<td style="text-align: left;">acs5/subject</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">S2503_C01_032</td>
-<td style="text-align: left;">Estimate!!Occupied housing units!!Occupied housing units!!MONTHLY HOUSING COSTS AS A PERCENTAGE OF HOUSEHOLD INCOME IN THE PAST 12 MONTHS!!$20,000 to $34,999!!30 percent or more</td>
-<td style="text-align: left;">acs5/subject</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">S2503_C01_036</td>
-<td style="text-align: left;">Estimate!!Occupied housing units!!Occupied housing units!!MONTHLY HOUSING COSTS AS A PERCENTAGE OF HOUSEHOLD INCOME IN THE PAST 12 MONTHS!!$35,000 to $49,999!!30 percent or more</td>
-<td style="text-align: left;">acs5/subject</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">S2503_C01_040</td>
-<td style="text-align: left;">Estimate!!Occupied housing units!!Occupied housing units!!MONTHLY HOUSING COSTS AS A PERCENTAGE OF HOUSEHOLD INCOME IN THE PAST 12 MONTHS!!$50,000 to $74,999!!30 percent or more</td>
-<td style="text-align: left;">acs5/subject</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">S2701_C04_001</td>
-<td style="text-align: left;">Estimate!!Uninsured!!Civilian noninstitutionalized population</td>
-<td style="text-align: left;">acs5/subject</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">S2701_C05_001</td>
-<td style="text-align: left;">Estimate!!Percent Uninsured!!Civilian noninstitutionalized population</td>
+<td style="text-align: left;">S0601_C01_049</td>
+<td style="text-align: left;">Total!!Estimate!!POVERTY STATUS IN THE PAST 12 MONTHS!!Population for whom poverty status is determined!!Below 100 percent of the poverty level</td>
 <td style="text-align: left;">acs5/subject</td>
 </tr>
 <tr class="even">
@@ -380,9 +350,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>$t2</p>
 <table class="table">
 <colgroup>
-<col style="width: 8%">
-<col style="width: 84%">
-<col style="width: 7%">
+<col style="width: 6%">
+<col style="width: 86%">
+<col style="width: 6%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -394,121 +364,31 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">B09001_001</td>
-<td style="text-align: left;">Estimate!!Total:</td>
+<td style="text-align: left;">Estimate!!Total</td>
 <td style="text-align: left;">acs5</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">B11012_010</td>
-<td style="text-align: left;">Estimate!!Total:!!Female householder, no spouse or partner present:!!With own children under 18 years</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">B11012_015</td>
-<td style="text-align: left;">Estimate!!Total:!!Male householder, no spouse or partner present:!!With own children under 18 years</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">B16005_001</td>
-<td style="text-align: left;">Estimate!!Total:</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">B16005_007</td>
-<td style="text-align: left;">Estimate!!Total:!!Native:!!Speak Spanish:!!Speak English “not well”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">B16005_008</td>
-<td style="text-align: left;">Estimate!!Total:!!Native:!!Speak Spanish:!!Speak English “not at all”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">B16005_012</td>
-<td style="text-align: left;">Estimate!!Total:!!Native:!!Speak other Indo-European languages:!!Speak English “not well”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">B16005_013</td>
-<td style="text-align: left;">Estimate!!Total:!!Native:!!Speak other Indo-European languages:!!Speak English “not at all”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">B16005_017</td>
-<td style="text-align: left;">Estimate!!Total:!!Native:!!Speak Asian and Pacific Island languages:!!Speak English “not well”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">B16005_018</td>
-<td style="text-align: left;">Estimate!!Total:!!Native:!!Speak Asian and Pacific Island languages:!!Speak English “not at all”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">B16005_022</td>
-<td style="text-align: left;">Estimate!!Total:!!Native:!!Speak other languages:!!Speak English “not well”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">B16005_023</td>
-<td style="text-align: left;">Estimate!!Total:!!Native:!!Speak other languages:!!Speak English “not at all”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">B16005_029</td>
-<td style="text-align: left;">Estimate!!Total:!!Foreign born:!!Speak Spanish:!!Speak English “not well”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">B16005_030</td>
-<td style="text-align: left;">Estimate!!Total:!!Foreign born:!!Speak Spanish:!!Speak English “not at all”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">B16005_034</td>
-<td style="text-align: left;">Estimate!!Total:!!Foreign born:!!Speak other Indo-European languages:!!Speak English “not well”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">B16005_035</td>
-<td style="text-align: left;">Estimate!!Total:!!Foreign born:!!Speak other Indo-European languages:!!Speak English “not at all”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">B16005_039</td>
-<td style="text-align: left;">Estimate!!Total:!!Foreign born:!!Speak Asian and Pacific Island languages:!!Speak English “not well”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">B16005_040</td>
-<td style="text-align: left;">Estimate!!Total:!!Foreign born:!!Speak Asian and Pacific Island languages:!!Speak English “not at all”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">B16005_044</td>
-<td style="text-align: left;">Estimate!!Total:!!Foreign born:!!Speak other languages:!!Speak English “not well”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">B16005_045</td>
-<td style="text-align: left;">Estimate!!Total:!!Foreign born:!!Speak other languages:!!Speak English “not at all”</td>
-<td style="text-align: left;">acs5</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">S0101_C01_030</td>
-<td style="text-align: left;">Estimate!!Total!!Total population!!SELECTED AGE CATEGORIES!!65 years and over</td>
-<td style="text-align: left;">acs5/subject</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">S0101_C02_030</td>
-<td style="text-align: left;">Estimate!!Percent!!Total population!!SELECTED AGE CATEGORIES!!65 years and over</td>
+<td style="text-align: left;">S0101_C01_028</td>
+<td style="text-align: left;">Total!!Estimate!!SELECTED AGE CATEGORIES!!65 years and over</td>
 <td style="text-align: left;">acs5/subject</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">DP02_0072</td>
+<td style="text-align: left;">DP02_0007</td>
+<td style="text-align: left;">Estimate!!HOUSEHOLDS BY TYPE!!Total households!!Family households (families)!!Male householder, no wife present, family!!With own children of the householder under 18 years</td>
+<td style="text-align: left;">acs5/profile</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">DP02_0009</td>
+<td style="text-align: left;">Estimate!!HOUSEHOLDS BY TYPE!!Total households!!Family households (families)!!Female householder, no husband present, family!!With own children of the householder under 18 years</td>
+<td style="text-align: left;">acs5/profile</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">DP02_0071</td>
 <td style="text-align: left;">Estimate!!DISABILITY STATUS OF THE CIVILIAN NONINSTITUTIONALIZED POPULATION!!Total Civilian Noninstitutionalized Population!!With a disability</td>
 <td style="text-align: left;">acs5/profile</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">DP02_0072P</td>
+<td style="text-align: left;">DP02_0071P</td>
 <td style="text-align: left;">Percent!!DISABILITY STATUS OF THE CIVILIAN NONINSTITUTIONALIZED POPULATION!!Total Civilian Noninstitutionalized Population!!With a disability</td>
 <td style="text-align: left;">acs5/profile</td>
 </tr>
@@ -517,9 +397,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>$t3</p>
 <table class="table">
 <colgroup>
-<col style="width: 6%">
+<col style="width: 10%">
 <col style="width: 84%">
-<col style="width: 8%">
+<col style="width: 5%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -530,39 +410,94 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;">DP05_0071</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Hispanic or Latino (of any race)</td>
-<td style="text-align: left;">acs5/profile</td>
+<td style="text-align: left;">B01001H_001</td>
+<td style="text-align: left;">Estimate!!Total</td>
+<td style="text-align: left;">acs5</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">DP05_0078</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Black or African American alone</td>
-<td style="text-align: left;">acs5/profile</td>
+<td style="text-align: left;">B16005_001</td>
+<td style="text-align: left;">Estimate!!Total</td>
+<td style="text-align: left;">acs5</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">DP05_0079</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!American Indian and Alaska Native alone</td>
-<td style="text-align: left;">acs5/profile</td>
+<td style="text-align: left;">B16005_007</td>
+<td style="text-align: left;">Estimate!!Total!!Native!!Speak Spanish!!Speak English “not well”</td>
+<td style="text-align: left;">acs5</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">DP05_0080</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Asian alone</td>
-<td style="text-align: left;">acs5/profile</td>
+<td style="text-align: left;">B16005_008</td>
+<td style="text-align: left;">Estimate!!Total!!Native!!Speak Spanish!!Speak English “not at all”</td>
+<td style="text-align: left;">acs5</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">DP05_0081</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Native Hawaiian and Other Pacific Islander alone</td>
-<td style="text-align: left;">acs5/profile</td>
+<td style="text-align: left;">B16005_012</td>
+<td style="text-align: left;">Estimate!!Total!!Native!!Speak other Indo-European languages!!Speak English “not well”</td>
+<td style="text-align: left;">acs5</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">DP05_0082</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Some other race alone</td>
-<td style="text-align: left;">acs5/profile</td>
+<td style="text-align: left;">B16005_013</td>
+<td style="text-align: left;">Estimate!!Total!!Native!!Speak other Indo-European languages!!Speak English “not at all”</td>
+<td style="text-align: left;">acs5</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">DP05_0083</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Two or more races</td>
-<td style="text-align: left;">acs5/profile</td>
+<td style="text-align: left;">B16005_017</td>
+<td style="text-align: left;">Estimate!!Total!!Native!!Speak Asian and Pacific Island languages!!Speak English “not well”</td>
+<td style="text-align: left;">acs5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">B16005_018</td>
+<td style="text-align: left;">Estimate!!Total!!Native!!Speak Asian and Pacific Island languages!!Speak English “not at all”</td>
+<td style="text-align: left;">acs5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">B16005_022</td>
+<td style="text-align: left;">Estimate!!Total!!Native!!Speak other languages!!Speak English “not well”</td>
+<td style="text-align: left;">acs5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">B16005_023</td>
+<td style="text-align: left;">Estimate!!Total!!Native!!Speak other languages!!Speak English “not at all”</td>
+<td style="text-align: left;">acs5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">B16005_029</td>
+<td style="text-align: left;">Estimate!!Total!!Foreign born!!Speak Spanish!!Speak English “not well”</td>
+<td style="text-align: left;">acs5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">B16005_030</td>
+<td style="text-align: left;">Estimate!!Total!!Foreign born!!Speak Spanish!!Speak English “not at all”</td>
+<td style="text-align: left;">acs5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">B16005_034</td>
+<td style="text-align: left;">Estimate!!Total!!Foreign born!!Speak other Indo-European languages!!Speak English “not well”</td>
+<td style="text-align: left;">acs5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">B16005_035</td>
+<td style="text-align: left;">Estimate!!Total!!Foreign born!!Speak other Indo-European languages!!Speak English “not at all”</td>
+<td style="text-align: left;">acs5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">B16005_039</td>
+<td style="text-align: left;">Estimate!!Total!!Foreign born!!Speak Asian and Pacific Island languages!!Speak English “not well”</td>
+<td style="text-align: left;">acs5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">B16005_040</td>
+<td style="text-align: left;">Estimate!!Total!!Foreign born!!Speak Asian and Pacific Island languages!!Speak English “not at all”</td>
+<td style="text-align: left;">acs5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">B16005_044</td>
+<td style="text-align: left;">Estimate!!Total!!Foreign born!!Speak other languages!!Speak English “not well”</td>
+<td style="text-align: left;">acs5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">B16005_045</td>
+<td style="text-align: left;">Estimate!!Total!!Foreign born!!Speak other languages!!Speak English “not at all”</td>
+<td style="text-align: left;">acs5</td>
 </tr>
 </tbody>
 </table>
@@ -583,7 +518,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">B26001_001</td>
-<td style="text-align: left;">Estimate!!Total:</td>
+<td style="text-align: left;">Estimate!!Total</td>
 <td style="text-align: left;">acs5</td>
 </tr>
 <tr class="even">
@@ -636,9 +571,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>$t5</p>
 <table class="table">
 <colgroup>
-<col style="width: 8%">
-<col style="width: 82%">
-<col style="width: 8%">
+<col style="width: 14%">
+<col style="width: 72%">
+<col style="width: 13%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -649,90 +584,20 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;">S2802_C01_001</td>
-<td style="text-align: left;">Estimate!!Total!!Total population in households</td>
+<td style="text-align: left;">S2701_C04_001</td>
+<td style="text-align: left;">Uninsured!!Estimate!!Civilian noninstitutionalized population</td>
 <td style="text-align: left;">acs5/subject</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">S2802_C02_001</td>
-<td style="text-align: left;">Estimate!!Broadband Internet Subscription!!With a computer!!Total population in households</td>
+<td style="text-align: left;">S2701_C05_001</td>
+<td style="text-align: left;">Percent Uninsured!!Estimate!!Civilian noninstitutionalized population</td>
 <td style="text-align: left;">acs5/subject</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">DP05_0071</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Hispanic or Latino (of any race)</td>
-<td style="text-align: left;">acs5/profile</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">DP05_0071P</td>
-<td style="text-align: left;">Percent!!HISPANIC OR LATINO AND RACE!!Total population!!Hispanic or Latino (of any race)</td>
-<td style="text-align: left;">acs5/profile</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">DP05_0078</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Black or African American alone</td>
-<td style="text-align: left;">acs5/profile</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">DP05_0078P</td>
-<td style="text-align: left;">Percent!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Black or African American alone</td>
-<td style="text-align: left;">acs5/profile</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">DP05_0079</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!American Indian and Alaska Native alone</td>
-<td style="text-align: left;">acs5/profile</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">DP05_0079P</td>
-<td style="text-align: left;">Percent!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!American Indian and Alaska Native alone</td>
-<td style="text-align: left;">acs5/profile</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">DP05_0080</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Asian alone</td>
-<td style="text-align: left;">acs5/profile</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">DP05_0080P</td>
-<td style="text-align: left;">Percent!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Asian alone</td>
-<td style="text-align: left;">acs5/profile</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">DP05_0081</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Native Hawaiian and Other Pacific Islander alone</td>
-<td style="text-align: left;">acs5/profile</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">DP05_0081P</td>
-<td style="text-align: left;">Percent!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Native Hawaiian and Other Pacific Islander alone</td>
-<td style="text-align: left;">acs5/profile</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">DP05_0082</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Some other race alone</td>
-<td style="text-align: left;">acs5/profile</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">DP05_0082P</td>
-<td style="text-align: left;">Percent!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Some other race alone</td>
-<td style="text-align: left;">acs5/profile</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">DP05_0083</td>
-<td style="text-align: left;">Estimate!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Two or more races</td>
-<td style="text-align: left;">acs5/profile</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">DP05_0083P</td>
-<td style="text-align: left;">Percent!!HISPANIC OR LATINO AND RACE!!Total population!!Not Hispanic or Latino!!Two or more races</td>
-<td style="text-align: left;">acs5/profile</td>
 </tr>
 </tbody>
 </table>
 <p>This single command downloads the 2015-2019 ACS5 at the zcta level and calculates the SVI theme percentiles for the entire country</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>svi <span class="ot">&lt;-</span> <span class="fu">find_svi</span>(<span class="at">year =</span> <span class="dv">2019</span>, <span class="at">geography =</span> <span class="st">"zcta"</span>, <span class="at">full.table =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>svi <span class="ot">&lt;-</span> <span class="fu">find_svi</span>(<span class="at">year =</span> <span class="dv">2016</span>, <span class="at">geography =</span> <span class="st">"zcta"</span>, <span class="at">full.table =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Calculated SVI is filtered to the state of Texas (FIPS: 48) and Louisiana (FIPS: 22)</p>
 <div class="cell">
@@ -799,7 +664,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(arrow)</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>TXLA_svi <span class="sc">%&gt;%</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">write_parquet</span>(<span class="st">"output/TXLA_ZCTA_SVI1519.parquet"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">write_parquet</span>(<span class="st">"output/TXLA_ZCTA_SVI1216.parquet"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 
 

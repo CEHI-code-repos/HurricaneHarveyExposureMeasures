@@ -7,6 +7,8 @@ We identify three major exposure categories which we aim to measure:
 - Flood
 - Wind
 - Precipitation
-- Distance from Stork Track
+- Distance from Storm Track
 
 We also calculated Social Vulnerability Index estimates at the ZCTA level
+
+You can find all the data within our [ArcGIS Online group](https://arcg.is/1bX41r).

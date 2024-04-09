@@ -3,3 +3,4 @@ _freeze
 *_cache
 output/*.parquet
 *.Rdata
+/.quarto/
