@@ -25,6 +25,8 @@ execute:
 ## Output
 
 -   `TXLA_ZCTA_dist2track.parquet`
+    -   **GEOID** - ZCTA GEOID
+    -   **dist2track** - Distance from geo-centroid to track (meters) 
 
 Downloaded hurricane track for Hurricane Harvey
 ```{r}
