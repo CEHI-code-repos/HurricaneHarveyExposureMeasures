@@ -30,7 +30,7 @@ NOAA Climate Data is collected at the station level, so the primary function of 
 * `TXLA_ZCTA_PRCPpred.parquet`
     -   **GEOID** - ZCTA GEOID
     -   **DATE** - Date (YYYY-MM-DD)
-    -   **PRCPpred** - Inverse Distance Weighted Daily Precipitation (mm)
+    -   **PRCPpred** - Inverse Distance Weighted Daily Precipitation (tenth of mm)
 
 ## Code
 
@@ -195,7 +195,7 @@ plots <- unique(TXLA_station_data$DATE) %>% map(~
     scale_fill_distiller(
       limits = c(0, max),
       palette = "RdYlGn",
-      name = "Precipitation (mm)",
+      name = "Precipitation (1/10 of mm)",
       guide = guide_colorbar(
         direction = "horizontal",
         title.position = "top")) +
