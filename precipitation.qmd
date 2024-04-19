@@ -201,11 +201,11 @@ plots <- unique(TXLA_station_data$DATE) %>% map(~
         title.position = "top")) +
     theme_void() +
     theme(
-      plot.title = element_text(face = "bold", size = 24),
-      plot.subtitle = element_text(face = "bold", size = 20),
-      plot.caption = element_text(size = 18, hjust = 0),
-      legend.title = element_text(face = "bold", size = 20),
-      legend.text = element_text(face = "bold", size = 20),
+      plot.title = element_text(face = "bold", size = 20),
+      plot.subtitle = element_text(face = "bold", size = 18),
+      plot.caption = element_text(size = 16, hjust = 0),
+      legend.title = element_text(face = "bold", size = 18),
+      legend.text = element_text(face = "bold", size = 18),
       legend.title.align=0.5,
       legend.position = "bottom",
       legend.key.width = unit(dev.size()[1] / 10, "inches")) +
@@ -224,8 +224,6 @@ library(magick)
 
 files <- map(unique(TXLA_station_data$DATE), ~
   file.path(tempdir(), str_c(.x, ".png")))
-
-plan(multisession, workers = 20)
 
 unlist(files)[20:40] %>%
   map2(plots[20:40], ~ ggsave(.x, .y))
