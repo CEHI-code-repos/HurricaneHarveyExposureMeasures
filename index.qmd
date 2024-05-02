@@ -8,6 +8,7 @@ We identify three major exposure categories which we aim to measure:
 - Wind
 - Precipitation
 - Distance from Storm Track
+- Tornados
 
 We also calculated Social Vulnerability Index estimates at the ZCTA level
 

@@ -15,6 +15,7 @@ book:
         - precipitation.qmd
         - distance.qmd
         - svi.qmd
+        - tornado.qmd
 
 bibliography: references.bib
 
