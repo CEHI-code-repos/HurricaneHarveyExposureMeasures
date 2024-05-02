@@ -24,7 +24,7 @@ The `stormwindmodel` estimates wind exposure for points. In this case we used wi
 3.  Then, the ZCTAs were joined to the [US Census ZCTA to County Crosswalk](https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt) in order to identify Texas and Louisiana ZCTAs
 4.  The ZCTAs were filtered to Texas and Louisiana
 5.  Geometrics centroids were calculated for each ZCTA
-6.  The `get_grid_winds` command was used to calculate wind exposure for each centroid. It works by
+6.  The `calc_grid_winds` and `summarize_grid_winds` commands were used to calculate wind exposure for each centroid. It works by
     a.  Imputing the hurricane track to every 15 minutes
     b.  Adding the wind radii from the [HURDAT2](https://www.nhc.noaa.gov/data/)
     c.  Modeling wind exposure for each point
@@ -33,9 +33,9 @@ More information about the `stormwindmodel` package and variables calculated are
 
 ## Output
 
--   `TXLA_ZCTA_AL092017_stormwindmodel.parquet`
+-   `TXLA_ZCTA_AL092017_stormwindmodel`
     -   **GEOID** - ZCTA
-    -   **date_time_max_wind** - date & time where maximum wind was sustained
+    -   **date_time_max_wind** - UTC date & time where maximum wind was sustained
     -   **vmax_sust** - Maximum 10-m 1-min sustained wind for the tropical cyclone (m/s)
     -   **vmax_gust** - Max 10-m 1-min gust wind experienced at grid point (m/s)
     -   **sust_dur** - Duration of time a certain sustained wind was experienced at grid point (minutes)
@@ -83,8 +83,7 @@ ZCTAs_centers_df <- ZCTAs_center %>%
     glon = map_dbl(geometry, function(geo) st_coordinates(geo)[[1]]),
     glandsea = as.logical(1)) %>%
   select(gridid, glat, glon, glandsea) %>%
-  st_drop_geometry() %>%
-  filter(!is.na(glat))
+  st_drop_geometry()
 ```
 
 Geo-centroids
@@ -97,15 +96,40 @@ ggplot() +
 
 Calculated wind exposure
 ```{r}
-AL092017_winds <- get_grid_winds(hurr_track = AL092017_track, 
-  grid_df = ZCTAs_centers_df) %>%
+AL092017_grid_winds <- calc_grid_winds(hurr_track = AL092017_track, 
+  grid_df = ZCTAs_centers_df) 
+
+# parsing error was present in the package's code
+summarize_grid_winds_fix <- function (grid_winds, gust_duration_cut = 20, sust_duration_cut = 20, 
+    tint = 0.25) {
+    calc_sust_dur <- function(wind) {
+        60 * tint * sum(wind > sust_duration_cut, na.rm = TRUE)
+    }
+    calc_gust_dur <- function(wind) {
+        60 * tint * sum(wind > gust_duration_cut, na.rm = TRUE)
+    }
+    grid_wind_summary <- tibble::tibble(gridid = colnames(grid_winds),
+        date_time_max_wind = rownames(grid_winds)[apply(grid_winds,
+            MARGIN = 2, FUN = which.max)], vmax_sust = apply(grid_winds,
+            MARGIN = 2, FUN = max, na.rm = TRUE), vmax_gust = .data$vmax_sust *
+            1.49, sust_dur = apply(grid_winds, MARGIN = 2, FUN = calc_sust_dur),
+        gust_dur = apply(grid_winds, MARGIN = 2, FUN = calc_gust_dur)) %>%
+        dplyr::mutate(date_time_max_wind = ifelse(.data$vmax_sust ==
+            0, NA, .data$date_time_max_wind))
+    return(grid_wind_summary)
+}
+
+AL092017_winds <- summarize_grid_winds_fix(AL092017_grid_winds$vmax_sust) %>%
   rename(GEOID = gridid)
 ```
 
 ```{r}
+#| output: false
+
 AL092017_winds_sf <- AL092017_winds %>%
   left_join(zctas(cb = FALSE, year = 2017), by = join_by(GEOID == GEOID10)) %>%
   st_as_sf() %>%
+  mutate(date_time_max_wind = as_datetime(date_time_max_wind)) %>%
   select(-c(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))
 ```
 
@@ -113,7 +137,7 @@ Plotted wind measures
 ```{r}
 library(gridExtra)
 
-output_maps <- c("vmax_sust", "vmax_gust", "sust_dur", "gust_dur") %>%
+output_maps <- c("vmax_sust", "vmax_gust", "sust_dur", "gust_dur", "date_time_max_wind") %>%
   map(~
     AL092017_winds_sf %>%
       ggplot() +
@@ -125,8 +149,8 @@ do.call(grid.arrange, c(output_maps, ncol = 2))
 ```
 
 ```{r}
-library(arrow)
+# output: false
 
 AL092017_winds %>%
-  write_parquet("output/TXLA_ZCTA_stormwindmodel.parquet")
+  st_write("output/TXLA_ZCTA_stormwindmodel.gpkg", "TXLA_ZCTA_stormwindmodel", append = FALSE)
 ```

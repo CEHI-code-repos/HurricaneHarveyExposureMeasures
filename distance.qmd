@@ -16,31 +16,35 @@ execute:
 ## Data Processing
 
 1.  Hurricane data was downloaded using `hurricaneexposuredata` package using the `data("hurr_tracks")` command and filtered using the Harvey Automated Tropical Cyclone Forecasting code (AL092017)
-2.  Separately, 2017 ZCTAs downloaded from the [US Census Cartographic Boundary Files](https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.2017.html#list-tab-1556094155)
-3.  Then, the ZCTAs were joined to the [US Census ZCTA to County Crosswalk](https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt) in order to identify Texas and Louisiana ZCTAs
-4.  The ZCTAs were filtered to Texas and Louisiana
-5.  ZCTA geo centroid were calculated
-6.  The shortest distance from the geo centroid for each ZCTA to the hurricane track is calculated
+2.  Hurricane track was imputed to every 15 minutes using `create_full_track` from the `stormwindmodel` package. 
+3.  Separately, 2017 ZCTAs downloaded from the [US Census Cartographic Boundary Files](https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.2017.html#list-tab-1556094155)
+4.  Then, the ZCTAs were joined to the [US Census ZCTA to County Crosswalk](https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt) in order to identify Texas and Louisiana ZCTAs
+5.  The ZCTAs were filtered to Texas and Louisiana
+6.  ZCTA geo centroid were calculated
+7.  The distance from geo-centroid of each ZCTA to closest point on imputed track and time when imputed track was closest were calculated
 
 ## Output
 
--   `TXLA_ZCTA_dist2track.parquet`
+-   `TXLA_ZCTA_dist2track`
     -   **GEOID** - ZCTA GEOID
-    -   **dist2track** - Distance from geo-centroid to track (meters) 
+    -   **dist2track** - Distance from geo-centroid to closest point on imputed track (meters)
+    -   **dateTime** - UTC date and time where geo-centroid is closest to imputed track 
 
-Downloaded hurricane track for Hurricane Harvey
+Download, filter, and impute hurricane tract
 ```{r}
-library(hurricaneexposuredata)
-library(sf)
 library(tidyverse)
+library(sf)
+library(hurricaneexposure)
 
-data("hurr_tracks")
+data(hurr_tracks, package = "hurricaneexposuredata")
 
 AL092017_track <- hurr_tracks %>%
   filter(usa_atcf_id == "AL092017") %>%
-  mutate(date = as_datetime(date, format = "%Y%m%d%H%M")) %>%
+  create_full_track() %>%
   arrange(date) %>%
-  st_as_sf(coords = c("longitude", "latitude"), crs = "epsg:4269") %>%
+  st_as_sf(coords = c("tclon", "tclat"), crs = "epsg:4269")
+
+AL092017_track_line <- AL092017_track %>%
   st_combine() %>%
   st_cast("LINESTRING")
 ```
@@ -69,10 +73,18 @@ ZCTAs_center <- ZCTAs_sf %>%
 
 Calculated shortest distance to track from geo centroids
 ```{r}
-TXLA_dist2track <- ZCTAs_center %>%
-  bind_cols(st_distance(., AL092017_track)) %>%
-  rename(dist2track = `...3`) %>%
-  st_drop_geometry()
+TXLA_dist2track <- st_join(ZCTAs_center, AL092017_track, join = st_nearest_feature) %>%
+  rename(dateTime = date) %>%
+  rowwise() %>%
+  mutate(est_track_point = 
+    AL092017_track %>%
+      filter(date == dateTime) %>%
+      st_geometry()
+  ) %>%
+  mutate(dist2track = st_distance(geometry, est_track_point)) %>%
+  mutate(dist2track = as.numeric(dist2track)) %>%
+  st_drop_geometry() %>%
+  select(GEOID, dateTime, dist2track)
 ```
 
 ```{r}
@@ -81,7 +93,7 @@ TXLA_dist2track %>%
   st_as_sf() %>%
   ggplot() +
     geom_sf(aes(fill = dist2track)) +
-    geom_sf(data = st_crop(AL092017_track, st_bbox(ZCTAs_sf))) +
+    geom_sf(data = st_crop(AL092017_track_line, ZCTAs_sf)) +
     coord_sf(datum = "ESRI:102003") +
     scale_fill_distiller(
       palette = "Oranges",
@@ -108,8 +120,8 @@ TXLA_dist2track %>%
 
 
 ```{r}
-library(arrow)
+# output: false
 
 TXLA_dist2track %>%
-  write_parquet("output/TXLA_ZCTA_dist2track.parquet")
+  st_write("output/TXLA_ZCTA_dist2track.gpkg", "TXLA_ZCTA_dist2track", append = FALSE)
 ```

@@ -27,7 +27,7 @@ NOAA Climate Data is collected at the station level, so the primary function of 
     a.  Cross validation was preformed (not shown) and optimal hyperparameters idp = 0.5 and nmax = 8 were identified
 
 ## Output
-* `TXLA_ZCTA_PRCPpred.parquet`
+* `TXLA_ZCTA_PRCPpred`
     -   **GEOID** - ZCTA GEOID
     -   **DATE** - Date (YYYY-MM-DD)
     -   **PRCPpred** - Inverse Distance Weighted Daily Precipitation (tenth of mm)
@@ -238,9 +238,8 @@ unlist(files)[20:40] %>%
 
 
 ```{r}
-library(arrow)
+# output: false
 
 TXLA_idw_preds %>%
-  st_drop_geometry() %>%
-  write_parquet("output/TXLA_ZCTA_PRCPpred.parquet")
+  st_write("output/TXLA_ZCTA_PRCPpred.gpkg", "TXLA_ZCTA_PRCPpred", append = FALSE)
 ```

@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.4.551">
+<meta name="generator" content="quarto-1.4.552">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -244,7 +244,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>Then, the ZCTAs were joined to the <a href="https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt">US Census ZCTA to County Crosswalk</a> in order to identify Texas and Louisiana ZCTAs</li>
 <li>The ZCTAs were filtered to Texas and Louisiana</li>
 <li>Geometrics centroids were calculated for each ZCTA</li>
-<li>The <code>get_grid_winds</code> command was used to calculate wind exposure for each centroid. It works by
+<li>The <code>calc_grid_winds</code> and <code>summarize_grid_winds</code> commands were used to calculate wind exposure for each centroid. It works by
 <ol type="a">
 <li>Imputing the hurricane track to every 15 minutes</li>
 <li>Adding the wind radii from the <a href="https://www.nhc.noaa.gov/data/">HURDAT2</a></li>
@@ -256,10 +256,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="output" class="level2" data-number="2.3">
 <h2 data-number="2.3" class="anchored" data-anchor-id="output"><span class="header-section-number">2.3</span> Output</h2>
 <ul>
-<li><code>TXLA_ZCTA_AL092017_stormwindmodel.parquet</code>
+<li><code>TXLA_ZCTA_AL092017_stormwindmodel</code>
 <ul>
 <li><strong>GEOID</strong> - ZCTA</li>
-<li><strong>date_time_max_wind</strong> - date &amp; time where maximum wind was sustained</li>
+<li><strong>date_time_max_wind</strong> - UTC date &amp; time where maximum wind was sustained</li>
 <li><strong>vmax_sust</strong> - Maximum 10-m 1-min sustained wind for the tropical cyclone (m/s)</li>
 <li><strong>vmax_gust</strong> - Max 10-m 1-min gust wind experienced at grid point (m/s)</li>
 <li><strong>sust_dur</strong> - Duration of time a certain sustained wind was experienced at grid point (minutes)</li>
@@ -307,8 +307,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">glon =</span> <span class="fu">map_dbl</span>(geometry, <span class="cf">function</span>(geo) <span class="fu">st_coordinates</span>(geo)[[<span class="dv">1</span>]]),</span>
 <span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">glandsea =</span> <span class="fu">as.logical</span>(<span class="dv">1</span>)) <span class="sc">%&gt;%</span></span>
 <span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(gridid, glat, glon, glandsea) <span class="sc">%&gt;%</span></span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(glat))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Geo-centroids</p>
 <div class="cell">
@@ -326,21 +325,44 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <p>Calculated wind exposure</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>AL092017_winds <span class="ot">&lt;-</span> <span class="fu">get_grid_winds</span>(<span class="at">hurr_track =</span> AL092017_track, </span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">grid_df =</span> ZCTAs_centers_df) <span class="sc">%&gt;%</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">GEOID =</span> gridid)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>AL092017_grid_winds <span class="ot">&lt;-</span> <span class="fu">calc_grid_winds</span>(<span class="at">hurr_track =</span> AL092017_track, </span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">grid_df =</span> ZCTAs_centers_df) </span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># parsing error was present in the package's code</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>summarize_grid_winds_fix <span class="ot">&lt;-</span> <span class="cf">function</span> (grid_winds, <span class="at">gust_duration_cut =</span> <span class="dv">20</span>, <span class="at">sust_duration_cut =</span> <span class="dv">20</span>, </span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">tint =</span> <span class="fl">0.25</span>) {</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    calc_sust_dur <span class="ot">&lt;-</span> <span class="cf">function</span>(wind) {</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>        <span class="dv">60</span> <span class="sc">*</span> tint <span class="sc">*</span> <span class="fu">sum</span>(wind <span class="sc">&gt;</span> sust_duration_cut, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    calc_gust_dur <span class="ot">&lt;-</span> <span class="cf">function</span>(wind) {</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>        <span class="dv">60</span> <span class="sc">*</span> tint <span class="sc">*</span> <span class="fu">sum</span>(wind <span class="sc">&gt;</span> gust_duration_cut, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    grid_wind_summary <span class="ot">&lt;-</span> tibble<span class="sc">::</span><span class="fu">tibble</span>(<span class="at">gridid =</span> <span class="fu">colnames</span>(grid_winds),</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>        <span class="at">date_time_max_wind =</span> <span class="fu">rownames</span>(grid_winds)[<span class="fu">apply</span>(grid_winds,</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>            <span class="at">MARGIN =</span> <span class="dv">2</span>, <span class="at">FUN =</span> which.max)], <span class="at">vmax_sust =</span> <span class="fu">apply</span>(grid_winds,</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>            <span class="at">MARGIN =</span> <span class="dv">2</span>, <span class="at">FUN =</span> max, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">vmax_gust =</span> .data<span class="sc">$</span>vmax_sust <span class="sc">*</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>            <span class="fl">1.49</span>, <span class="at">sust_dur =</span> <span class="fu">apply</span>(grid_winds, <span class="at">MARGIN =</span> <span class="dv">2</span>, <span class="at">FUN =</span> calc_sust_dur),</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>        <span class="at">gust_dur =</span> <span class="fu">apply</span>(grid_winds, <span class="at">MARGIN =</span> <span class="dv">2</span>, <span class="at">FUN =</span> calc_gust_dur)) <span class="sc">%&gt;%</span></span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>        dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">date_time_max_wind =</span> <span class="fu">ifelse</span>(.data<span class="sc">$</span>vmax_sust <span class="sc">==</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>            <span class="dv">0</span>, <span class="cn">NA</span>, .data<span class="sc">$</span>date_time_max_wind))</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(grid_wind_summary)</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>AL092017_winds <span class="ot">&lt;-</span> <span class="fu">summarize_grid_winds_fix</span>(AL092017_grid_winds<span class="sc">$</span>vmax_sust) <span class="sc">%&gt;%</span></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">GEOID =</span> gridid)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>AL092017_winds_sf <span class="ot">&lt;-</span> AL092017_winds <span class="sc">%&gt;%</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(<span class="fu">zctas</span>(<span class="at">cb =</span> <span class="cn">FALSE</span>, <span class="at">year =</span> <span class="dv">2017</span>), <span class="at">by =</span> <span class="fu">join_by</span>(GEOID <span class="sc">==</span> GEOID10)) <span class="sc">%&gt;%</span></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_as_sf</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">date_time_max_wind =</span> <span class="fu">as_datetime</span>(date_time_max_wind)) <span class="sc">%&gt;%</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(ZCTA5CE10, CLASSFP10, MTFCC10, FUNCSTAT10, ALAND10, AWATER10, INTPTLAT10, INTPTLON10))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Plotted wind measures</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(gridExtra)</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>output_maps <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"vmax_sust"</span>, <span class="st">"vmax_gust"</span>, <span class="st">"sust_dur"</span>, <span class="st">"gust_dur"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>output_maps <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"vmax_sust"</span>, <span class="st">"vmax_gust"</span>, <span class="st">"sust_dur"</span>, <span class="st">"gust_dur"</span>, <span class="st">"date_time_max_wind"</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(<span class="sc">~</span></span>
 <span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    AL092017_winds_sf <span class="sc">%&gt;%</span></span>
 <span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>      <span class="fu">ggplot</span>() <span class="sc">+</span></span>
@@ -358,10 +380,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(arrow)</span>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># output: false</span></span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>AL092017_winds <span class="sc">%&gt;%</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">write_parquet</span>(<span class="st">"output/TXLA_ZCTA_stormwindmodel.parquet"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_write</span>(<span class="st">"output/TXLA_ZCTA_stormwindmodel.gpkg"</span>, <span class="st">"TXLA_ZCTA_stormwindmodel"</span>, <span class="at">append =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Deleting layer `TXLA_ZCTA_stormwindmodel' using driver `GPKG'
+Writing layer `TXLA_ZCTA_stormwindmodel' to data source 
+  `output/TXLA_ZCTA_stormwindmodel.gpkg' using driver `GPKG'
+Writing 2455 features with 6 fields without geometries.</code></pre>
+</div>
 </div>
 
 

@@ -2,5 +2,7 @@ _freeze
 .quarto
 *_cache
 output/*.parquet
+output/*.dbf
+output/*.gpkg
 *.Rdata
 /.quarto/

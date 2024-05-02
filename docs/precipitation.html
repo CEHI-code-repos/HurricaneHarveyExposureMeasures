@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.4.551">
+<meta name="generator" content="quarto-1.4.552">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -253,7 +253,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="output" class="level2" data-number="3.3">
 <h2 data-number="3.3" class="anchored" data-anchor-id="output"><span class="header-section-number">3.3</span> Output</h2>
 <ul>
-<li><code>TXLA_ZCTA_PRCPpred.parquet</code>
+<li><code>TXLA_ZCTA_PRCPpred</code>
 <ul>
 <li><strong>GEOID</strong> - ZCTA GEOID</li>
 <li><strong>DATE</strong> - Date (YYYY-MM-DD)</li>
@@ -395,11 +395,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>Stitched images into a gif</p>
 <p><img src="output/TXLA_ZCTA_PRCPpred.gif" class="img-fluid"></p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(arrow)</span>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># output: false</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>TXLA_idw_preds <span class="sc">%&gt;%</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">write_parquet</span>(<span class="st">"output/TXLA_ZCTA_PRCPpred.parquet"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_write</span>(<span class="st">"output/TXLA_ZCTA_PRCPpred.gpkg"</span>, <span class="st">"TXLA_ZCTA_PRCPpred"</span>, <span class="at">append =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Deleting layer `TXLA_ZCTA_PRCPpred' using driver `GPKG'
+Writing layer `TXLA_ZCTA_PRCPpred' to data source 
+  `output/TXLA_ZCTA_PRCPpred.gpkg' using driver `GPKG'
+Writing 149755 features with 3 fields and geometry type Multi Polygon.</code></pre>
+</div>
 </div>
 
 
